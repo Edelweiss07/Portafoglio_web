@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Portafoglio</title>
+  <meta name="description" content="Contabilità personale: proiezione del saldo, voci periodiche, salvadanai e obiettivi.">
+  <meta name="theme-color" content="#1B6B50">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Portafoglio">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icone/icona-192.png">
+  <link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/stile.css">
+</head>
+<body>
+  <header class="testata">
+    <h1 id="titolo">Portafoglio</h1>
+    <button type="button" class="icona-btn info-btn" id="info-pagina" data-info="home" aria-label="Informazioni sulla schermata">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+    </button>
+  </header>
+  <main id="vista"></main>
+  <nav class="navbar" aria-label="Schermate"></nav>
+  <noscript><p style="padding:1rem">Per usare il Portafoglio attiva JavaScript.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
