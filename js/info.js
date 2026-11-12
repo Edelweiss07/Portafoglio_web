@@ -131,7 +131,7 @@ ${GRASSETTO}`],
 
   obiettivoSalvadanaio: ['Obiettivo e frasi del salvadanaio', `• Obiettivo: l'importo da raggiungere (0 = nessun obiettivo).
 • Scadenza: mese e anno entro cui raggiungerlo. Serve a calcolare quanto mettere da parte ogni mese.
-• Frasi: la soglia è la percentuale dell'obiettivo raggiunta. Viene mostrata la frase con la soglia più alta non superiore all'avanzamento.
+• Frasi: la soglia è la percentuale dell'obiettivo raggiunta. Ogni frase compare quando l'avanzamento raggiunge la sua soglia e resta fino alla soglia successiva; sotto la soglia più bassa non compare nessuna frase.
 
 ${SMART}
 
@@ -152,8 +152,8 @@ Esempio: se la proiezione inizia a gennaio, inserisci i valori al 31 dicembre.`]
   parametri: ['Parametri', `• Disponibilità carte (plafond): il limite mensile delle carte di credito. Serve a calcolare le Spese carte attuali = Plafond − Residuo carte.
 Il valore del buono pasto si imposta mese per mese con il pulsante "Parametri del mese".`],
 
-  frasiHome: ['Frasi motivazionali della Home', `Ogni frase ha una soglia in euro. In Home compare la frase con la soglia più alta non superiore alla Disponibilità; se la Disponibilità è sotto tutte le soglie, compare quella con la soglia più bassa.
-Esempio: soglie −200, 0, 500 → con Disponibilità 300 compare la frase della soglia 0.
+  frasiHome: ['Frasi motivazionali della Home', `Ogni frase ha una soglia in euro: compare quando la Disponibilità raggiunge quella soglia e resta visibile fino a quando non si raggiunge la soglia successiva. Sotto la soglia più bassa non compare nessuna frase; lo stesso vale per un intervallo la cui frase è vuota.
+Esempio: soglie −200, 0, 500 → con Disponibilità 300 compare la frase della soglia 0; con 500 o più quella della soglia 500; sotto −200 nessuna frase.
 
 ${FRASI_SMART}
 

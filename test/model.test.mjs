@@ -105,14 +105,21 @@ test('apertura in un mese nuovo chiude il mese precedente', () => {
   assert.equal(M.aperturaApp(dopo, { y: 2026, m: 4 }).chiusura, null);
 });
 
-test('frasi motivazionali', () => {
+test('frasi motivazionali: dalla soglia fino alla successiva', () => {
   const f = [{ soglia: 0, testo: 'pari' }, { soglia: -500, testo: 'sotto' }, { soglia: 500, testo: 'sopra' }];
-  assert.equal(M.frasePer(-2000, f), 'sotto');
+  assert.equal(M.frasePer(-2000, f), null); // sotto la soglia più bassa: nessuna frase
+  assert.equal(M.frasePer(-500, f), 'sotto');
   assert.equal(M.frasePer(-1, f), 'sotto');
   assert.equal(M.frasePer(0, f), 'pari');
   assert.equal(M.frasePer(499, f), 'pari');
+  assert.equal(M.frasePer(500, f), 'sopra');
   assert.equal(M.frasePer(800, f), 'sopra');
   assert.equal(M.frasePer(800, []), null);
+  // un intervallo con frase vuota non mostra nulla e non estende la frase precedente
+  const g = [{ soglia: 0, testo: 'pari' }, { soglia: 100, testo: '' }, { soglia: 500, testo: 'sopra' }];
+  assert.equal(M.frasePer(50, g), 'pari');
+  assert.equal(M.frasePer(200, g), null);
+  assert.equal(M.frasePer(600, g), 'sopra');
 });
 
 test('avanzamento salvadanaio', () => {

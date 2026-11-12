@@ -9,7 +9,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.0.0';
+export const VERSIONE_APP = '1.0.1';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -191,7 +191,7 @@ function homeCalcoli() {
     ${riga('Disponibilità carte (plafond)', stato.impostazioni.plafondCarte)}
     ${rigaValore('Spese carte attuali', r.speseCarte)}
     ${rigaValore('Saldo disponibile', r.saldoDisponibile, { grande: true })}
-    ${r.target != null ? `<button type="button" class="btn btn-contorno pieno" data-azione="parametri" data-mese="${M.chiave(oggi().y, oggi().m)}">${ICONE.matita}Parametri del mese (valore buoni)</button>` : ''}
+    ${r.target != null ? `<button type="button" class="btn btn-contorno pieno" data-azione="parametri" data-mese="${M.chiave(oggi().y, oggi().m)}">${ICONE.matita}Parametri del mese</button>` : ''}
     <p class="nota">I valori in grassetto sono calcolati automaticamente.</p>`;
 }
 
@@ -586,7 +586,7 @@ function paginaOpzioni() {
     ${sezione("Valori di partenza (fine del mese prima dell'inizio)", `${campo('Saldo contabile iniziale', i.saldoIniziale, 'data-imp="saldoIniziale"')}
       ${campo('Residuo finanziamenti iniziale', i.residuoIniziale, 'data-imp="residuoIniziale"')}`, { info: 'valoriPartenza' })}
     ${sezione('Parametri', campo('Disponibilità carte (plafond)', i.plafondCarte, 'data-imp="plafondCarte"'), { info: 'parametri' })}
-    ${sezione('Frasi motivazionali della Home', `<p class="nota">In Home compare la frase con la soglia più alta che non supera la Disponibilità. Se la Disponibilità è sotto tutte le soglie, compare la frase con la soglia più bassa.</p>
+    ${sezione('Frasi motivazionali della Home', `<p class="nota">Ogni frase compare quando la Disponibilità raggiunge la sua soglia e resta fino alla soglia successiva. Sotto la soglia più bassa non compare nessuna frase.</p>
       <div id="frasi-home">${editorFrasi(i.frasi, 'Disponibilità da (€)')}</div>`, { info: 'frasiHome' })}
     ${sezione('Backup ed esportazione', `<p class="nota">${esc(ultimoBackupTxt())}</p>
       <button type="button" class="btn btn-primario pieno" data-azione="esporta-backup">Esporta backup</button>

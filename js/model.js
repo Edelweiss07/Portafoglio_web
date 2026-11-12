@@ -239,14 +239,18 @@ export function aperturaApp(s, oggi) {
   return { stato: chiuso, chiusura: d == null ? null : { mese: ultimo, importo: d } };
 }
 
-/** La frase con la soglia più alta non superiore al valore; sotto tutte, quella più bassa. */
+/**
+ * Ogni frase vale dalla sua soglia (inclusa) fino alla soglia successiva (esclusa).
+ * Sotto la soglia più bassa, o in un intervallo con frase vuota, non si mostra nessuna frase.
+ */
 export function frasePer(valore, frasi) {
-  if (valore == null) return null;
-  const ord = (frasi || []).filter((f) => f.testo && f.testo.trim()).sort((a, b) => a.soglia - b.soglia);
-  if (!ord.length) return null;
-  let scelta = ord[0];
-  for (const f of ord) if (valore >= f.soglia) scelta = f;
-  return scelta.testo;
+  if (valore == null || !isFinite(valore)) return null;
+  let scelta = null;
+  for (const f of frasi || []) {
+    if (valore >= f.soglia && (scelta == null || f.soglia >= scelta.soglia)) scelta = f;
+  }
+  const testo = scelta?.testo?.trim();
+  return testo ? scelta.testo : null;
 }
 
 /** Avanzamento di un salvadanaio verso l'obiettivo; null se non ha obiettivo. */
