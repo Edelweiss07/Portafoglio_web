@@ -140,16 +140,37 @@ test('avanzamento salvadanaio', () => {
   assert.equal(M.avanzamento(stato(), r, 'y', { y: 2026, m: 4 }), null);
 });
 
-test('dati di esempio coprono quattro anni', () => {
-  const r = M.proiezione(M.esempio(2026));
-  assert.equal(r.length, 48);
-  vicino(r[0].utile, 800);
-  vicino(r.find((x) => x.chiave === '2027-01').utile, 900);
+test('compilazione guidata crea lo stato', () => {
+  const r = {
+    inizio: { y: 2026, m: 11 }, anni: 3,
+    saldoIniziale: 3000, residuo: 5000, rata: 200,
+    entrate: 2200, spese: 1500, valoreBuono: 8,
+    corrente: { saldo: 3100, nonAddebitato: 120, nonAccreditato: 0, buoniResidui: 12, welfare: 0, residuoCarte: 900 }, plafond: 1500,
+    periodiche: [{ nome: 'Tredicesima', importo: 2000, entrata: true, mese: 12 }, { nome: 'Bollo auto', importo: 200, entrata: false, mese: 2 }, { nome: '', importo: 50, mese: 1 }],
+    straordinarie: [{ nome: 'Lavatrice', importo: 450, entrata: false, mese: 3, anno: 2027 }],
+    salvadanai: [{ nome: 'Emergenze', saldo: 1000, obiettivo: 4500, scadenzaMese: 12, scadenzaAnno: 2027 }, { nome: ' ' }],
+  };
+  const s = M.daCompilazione(r, { y: 2026, m: 11 });
+  assert.equal(s.impostazioni.fineAnno, 2029);
+  assert.deepEqual(s.voci.map((v) => [v.nome, v.importo, v.tipo]), [['Tredicesima', 2000, 'PERIODICO'], ['Bollo auto', -200, 'PERIODICO'], ['Lavatrice', -450, 'EXTRA']]);
+  assert.deepEqual(s.voci[1].mesi, ['2027-02', '2028-02', '2029-02']);
+  assert.deepEqual(s.voci[0].mesi, ['2026-12', '2027-12', '2028-12', '2029-12']);
+  assert.equal(s.salvadanai.length, 1);
+  assert.equal(s.salvadanai[0].scadenza, '2027-12');
+  const righe = M.proiezione(s);
+  vicino(righe[0].saldoContabile, 3000 + 700);
+  vicino(righe[1].saldoContabile, 3700 + 700 + 2000);
+  vicino(righe[0].residuoFinanziamenti, 4800);
+  vicino(righe[0].saldoNettoTotale, 3700 - 4800 - 1000);
+  vicino(M.riepilogo(s, { y: 2026, m: 11 }, righe).saldoBuoni, 96);
+  assert.equal(s.ultimoMeseAperto, '2026-11');
+  assert.equal(M.eVuoto(s), false);
+  assert.equal(M.eVuoto(M.vuoto({ y: 2026, m: 11 })), true);
 });
 
 test('backup: andata e ritorno e migrazione dalla versione 1', () => {
-  const s = M.esempio(2026);
-  assert.deepEqual(M.normalizza(JSON.parse(JSON.stringify(s))), (({ ultimoMeseAperto, ...x }) => x)(s));
+  const s = M.daCompilazione({ inizio: { y: 2026, m: 1 }, anni: 2, entrate: 2000, spese: 1000, periodiche: [{ nome: 'A', importo: 5, mese: 3 }], salvadanai: [{ nome: 'B', saldo: 1 }] }, { y: 2026, m: 1 });
+  assert.deepEqual(M.normalizza(JSON.parse(JSON.stringify(s))), s);
   const v1 = {
     impostazioni: { inizioAnno: 2026, inizioMese: 10, fineAnno: 2027, saldoIniziale: 100, residuoIniziale: 0, valoreBuono: 7, plafondCarte: 1600 },
     saldoCorrente: { saldo: 1, nonAddebitato: 0, nonAccreditato: 0, buoniResidui: 0, welfare: 0, residuoCarte: 0 },

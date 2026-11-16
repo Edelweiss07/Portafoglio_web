@@ -53,58 +53,65 @@ export function vuoto(oggi) {
   };
 }
 
-/**
- * Dati generici di esempio: anno indicato e i tre seguenti.
- * Se si passa [oggi], il saldo corrente viene calibrato perché la Disponibilità del mese sia +150 €.
- */
-export function esempio(anno, oggi = null) {
-  const s = esempioBase(anno);
-  if (oggi) {
-    const d = riepilogo(s, oggi).disponibilita;
-    if (d != null) s.saldoCorrente.saldo = Math.round(s.saldoCorrente.saldo - d + 150);
-  }
-  return s;
+/** true se non c'è nessun dato inserito (primo avvio o dopo "Cancella tutti i dati"). */
+export function eVuoto(s) {
+  if (!s) return true;
+  const c = s.saldoCorrente;
+  return !s.voci.length && !s.salvadanai.length && !Object.keys(s.mesi).length &&
+    !s.impostazioni.saldoIniziale && !s.impostazioni.residuoIniziale &&
+    Object.values(c).every((v) => !v);
 }
 
-function esempioBase(anno) {
-  const anni = [anno, anno + 1, anno + 2, anno + 3];
-  const ogniAnno = (...m) => anni.flatMap((a) => m.map((x) => chiave(a, x)));
-  let n = 0;
-  const p = (nome, importo, mesi) => ({ id: `p${n++}`, nome, importo, tipo: 'PERIODICO', mesi: mesi.sort() });
-  const e = (nome, importo, a, ...m) => ({
-    id: `e${n++}`, nome, importo, tipo: 'EXTRA', mesi: m.map((x) => chiave(a, x)), anno: a,
-  });
-  return {
-    versione: VERSIONE_DATI,
-    impostazioni: {
-      inizioAnno: anno, inizioMese: 1, fineAnno: anno + 3,
-      saldoIniziale: 5000, residuoIniziale: 12000, plafondCarte: 1500, frasi: clona(FRASI_PREDEFINITE),
-    },
-    saldoCorrente: { saldo: 6000, nonAddebitato: 300, nonAccreditato: 0, buoniResidui: 10, welfare: 0, residuoCarte: 1200 },
-    voci: [
-      p('Bollo auto', -200, ogniAnno(2)),
-      p('Assicurazione auto', -450, ogniAnno(3)),
-      p('TARI', -250, ogniAnno(5)),
-      p('Quattordicesima', 1500, ogniAnno(7)),
-      p('Vacanza estiva', -1500, ogniAnno(8)),
-      p('Abbonamento palestra', -300, ogniAnno(9)),
-      p('Manutenzione caldaia', -100, ogniAnno(10)),
-      p('Tredicesima', 2000, ogniAnno(12)),
-      p('Regali di Natale', -400, ogniAnno(12)),
-      e('Nuovo computer', -1200, anno, 4),
-      e('Rimborso 730', 600, anno + 1, 7),
-      e('Acconto cambio auto', -3000, anno + 2),
-    ],
-    salvadanai: [
-      { id: 'vacanze', nome: 'Vacanze', obiettivo: 1500, scadenza: chiave(anno + 1, 6), frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) },
-      { id: 'emergenze', nome: 'Emergenze', obiettivo: 3000, scadenza: chiave(anno + 1, 12), frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) },
-    ],
-    mesi: {
-      [chiave(anno, 1)]: { extra: 0, entrate: 2400, spese: 1600, valoreBuono: 8, rata: 250, salvadanai: { vacanze: 0, emergenze: 1000 } },
-      [chiave(anno, 6)]: { extra: 0, salvadanai: { vacanze: 500 } },
-      [chiave(anno + 1, 1)]: { extra: 0, entrate: 2500, salvadanai: { vacanze: 0 } },
-    },
+/**
+ * Crea lo stato dalle risposte della compilazione guidata.
+ * Gli importi delle voci sono positivi; "entrata" ne decide il segno.
+ */
+export function daCompilazione(r, oggi) {
+  const inizio = r.inizio;
+  const fineAnno = inizio.y + Math.max(1, Math.round(r.anni || 3));
+  const s = vuoto(oggi);
+  s.impostazioni = {
+    ...s.impostazioni,
+    inizioAnno: inizio.y, inizioMese: inizio.m, fineAnno,
+    saldoIniziale: r.saldoIniziale || 0, residuoIniziale: r.residuo || 0, plafondCarte: r.plafond || 0,
   };
+  s.saldoCorrente = {
+    saldo: r.corrente?.saldo || 0, nonAddebitato: r.corrente?.nonAddebitato || 0,
+    nonAccreditato: r.corrente?.nonAccreditato || 0, buoniResidui: r.corrente?.buoniResidui || 0,
+    welfare: r.corrente?.welfare || 0, residuoCarte: r.corrente?.residuoCarte || 0,
+  };
+  const segno = (v) => (v.entrata ? 1 : -1) * Math.abs(v.importo || 0);
+  let n = 0;
+  for (const v of r.periodiche || []) {
+    if (!v.nome?.trim() || !v.importo) continue;
+    const mesi = [];
+    for (let y = inizio.y; y <= fineAnno; y++) {
+      if (indice({ y, m: v.mese }) >= indice(inizio)) mesi.push(chiave(y, v.mese));
+    }
+    s.voci.push({ id: `p${n++}`, nome: v.nome.trim(), importo: segno(v), tipo: 'PERIODICO', mesi });
+  }
+  for (const v of r.straordinarie || []) {
+    if (!v.nome?.trim() || !v.importo) continue;
+    s.voci.push({ id: `e${n++}`, nome: v.nome.trim(), importo: segno(v), tipo: 'EXTRA', mesi: [chiave(v.anno, v.mese)], anno: v.anno });
+  }
+  const primo = { extra: 0 };
+  if (r.entrate) primo.entrate = r.entrate;
+  if (r.spese) primo.spese = r.spese;
+  if (r.valoreBuono) primo.valoreBuono = r.valoreBuono;
+  if (r.rata) primo.rata = r.rata;
+  const salv = {};
+  (r.salvadanai || []).filter((x) => x.nome?.trim()).forEach((x, i) => {
+    const id = `s${i}`;
+    const sv = { id, nome: x.nome.trim(), frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) };
+    if (x.obiettivo > 0) sv.obiettivo = x.obiettivo;
+    if (x.scadenzaMese >= 1 && x.scadenzaMese <= 12 && x.scadenzaAnno >= 2000) sv.scadenza = chiave(x.scadenzaAnno, x.scadenzaMese);
+    s.salvadanai.push(sv);
+    salv[id] = x.saldo || 0;
+  });
+  if (Object.keys(salv).length) primo.salvadanai = salv;
+  const k = chiave(inizio.y, inizio.m);
+  if (!meseVuoto(primo)) s.mesi[k] = primo;
+  return s;
 }
 
 // ---------- Mesi inseriti a mano ----------

@@ -1,6 +1,7 @@
 // Portafoglio – web app. Stesse funzioni dell'app Android 1.5.1, più backup all'avvio ed export Excel.
 import * as M from './model.js';
 import { esportaXlsx } from './esporta.js';
+import { avviaGuidata } from './guidata.js';
 import { INFO, RISCHI_BACKUP } from './info.js';
 import { COLORI, graficoBarre, graficoLinee } from './grafici.js';
 import {
@@ -9,7 +10,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.0.1';
+export const VERSIONE_APP = '1.1.0';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -27,8 +28,8 @@ function carica() {
     // dati illeggibili: li conservo a parte invece di perderli
     try { if (testo) localStorage.setItem(`${CHIAVE_STATO}.illeggibile.${Date.now()}`, testo); } catch (_) { /* spazio esaurito */ }
   }
-  const o = oggi();
-  return { ...M.esempio(o.y, o), ultimoMeseAperto: M.chiave(o.y, o.m) };
+  // primo avvio: nessun dato, parte la compilazione guidata
+  return M.vuoto(oggi());
 }
 
 let stato = carica();
@@ -592,8 +593,8 @@ function paginaOpzioni() {
       <button type="button" class="btn btn-primario pieno" data-azione="esporta-backup">Esporta backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="importa-backup">Importa backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="esporta-excel">Esporta in Excel (.xlsx)</button>
-      <button type="button" class="btn btn-testo pieno pericolo" data-azione="carica-esempio">Carica i dati di esempio</button>`, { info: 'backup' })}
-    ${sezione('Reset', `<p class="nota">Cancella voci, salvadanai, valori mensili e dati correnti. La proiezione ripartirà da zero dal mese corrente.</p>
+      <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>`, { info: 'backup' })}
+    ${sezione('Reset', `<p class="nota">Cancella voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata.</p>
       <button type="button" class="btn btn-pericolo pieno" data-azione="cancella-tutto">Cancella tutti i dati</button>`, { info: 'reset' })}
     <p class="nota centro">Portafoglio – versione ${VERSIONE_APP} (web)</p>
   </div>`;
@@ -678,6 +679,25 @@ function importaBackup() {
   inp.click();
 }
 
+// ---------- Compilazione guidata ----------
+
+function apriGuidata() {
+  avviaGuidata({
+    oggi: oggi(),
+    onFine: (nuovo) => {
+      ui.chiusura = null;
+      ui.anno = { proiezione: null, voci: null, salvadanai: null };
+      aggiorna(nuovo, false);
+      ui.pagina = 'home';
+      vista.scrollTop = 0;
+      render();
+      avviso('Il tuo Portafoglio è pronto');
+    },
+    onImporta: importaBackup,
+    onEsci: () => {},
+  });
+}
+
 function chiediBackupAvvio() {
   const ultimo = localStorage.getItem(CHIAVE_BACKUP);
   apriModale({
@@ -731,20 +751,23 @@ document.addEventListener('click', (ev) => {
     case 'esporta-backup': esportaBackup(); break;
     case 'importa-backup': importaBackup(); break;
     case 'esporta-excel': esportaExcel(); break;
-    case 'carica-esempio':
-      conferma({
-        titolo: 'Caricare i dati di esempio?',
-        testo: 'Tutti i dati attuali verranno sostituiti da dati generici di esempio. Se vuoi conservarli, esporta prima un backup.',
-        ok: 'Carica', pericolo: true,
-        onOk: () => { const o = oggi(); aggiorna({ ...M.esempio(o.y, o), ultimoMeseAperto: M.chiave(o.y, o.m) }); },
-      });
+    case 'guidata':
+      if (M.eVuoto(stato)) apriGuidata();
+      else {
+        conferma({
+          titolo: 'Ricominciare con la compilazione guidata?',
+          testo: 'Alla fine della compilazione i dati attuali verranno sostituiti da quelli nuovi. Se vuoi conservarli, esporta prima un backup.',
+          ok: 'Inizia', pericolo: true,
+          onOk: apriGuidata,
+        });
+      }
       break;
     case 'cancella-tutto':
       conferma({
         titolo: 'Cancellare tutti i dati?',
         testo: "Tutti i dati dell'app verranno eliminati e non potranno essere recuperati. Se vuoi conservarli, esporta prima un backup.",
         ok: 'Cancella tutto', pericolo: true,
-        onOk: () => { ui.chiusura = null; aggiorna(M.vuoto(oggi())); },
+        onOk: () => { ui.chiusura = null; aggiorna(M.vuoto(oggi())); apriGuidata(); },
       });
       break;
     default:
@@ -768,7 +791,9 @@ function costruisciNavbar() {
 costruisciNavbar();
 controllaCambioMese();
 render();
-chiediBackupAvvio();
+// senza dati parte la compilazione guidata; altrimenti la domanda sul backup
+if (M.eVuoto(stato)) apriGuidata();
+else chiediBackupAvvio();
 navigator.storage?.persist?.().catch(() => {});
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

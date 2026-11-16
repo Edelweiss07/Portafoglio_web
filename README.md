@@ -6,6 +6,9 @@ si installa sulla schermata Home come un'app e funziona anche senza internet.
 Ha le stesse funzioni dell'app Android 1.5.1 (Home con target e Disponibilità, Proiezione mese per mese,
 Voci periodiche e straordinarie, Salvadanai con obiettivi, frasi motivazionali, pulsanti ⓘ), più:
 
+- **Compilazione guidata**: al primo avvio (e dopo "Cancella tutti i dati") l'app fa le domande passo
+  passo per riempire Home, Voci e Salvadanai, con esempi e suggerimenti. Si può rifare da
+  Opzioni → Compilazione guidata. Non ci sono più dati di esempio.
 - **Richiesta di backup a ogni avvio**, con la spiegazione dei rischi di perdere i dati.
 - **Esportazione in Excel** (.xlsx) con 5 fogli: Home, Proiezione, Voci, Salvadanai, Impostazioni.
 
