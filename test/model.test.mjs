@@ -183,3 +183,37 @@ test('backup: andata e ritorno e migrazione dalla versione 1', () => {
   assert.deepEqual(n.salvadanai.map((x) => x.nome), ['Papà', 'Diana']);
   assert.throws(() => M.normalizza({ a: 1 }));
 });
+
+test('voce periodica: un mese attivato vale anche negli anni successivi', () => {
+  const v = { id: 'b', nome: 'Bollette', importo: -150, tipo: 'PERIODICO', mesi: [] };
+  const t = M.toggle(v, { y: 2026, m: 11 }, true, 2028);
+  assert.deepEqual(t.mesi, ['2026-11', '2027-11', '2028-11']);
+  // disattivare da un anno in poi lascia intatti gli anni precedenti
+  assert.deepEqual(M.toggle(t, { y: 2027, m: 11 }, false, 2028).mesi, ['2026-11']);
+  // senza fineAnno resta il comportamento di un solo anno
+  assert.deepEqual(M.toggle(v, { y: 2026, m: 11 }, true).mesi, ['2026-11']);
+});
+
+test('voce periodica su tutti i mesi: sottratta ogni mese per tutto il periodo', () => {
+  const s = M.vuoto({ y: 2026, m: 1 });
+  s.impostazioni.fineAnno = 2028;
+  s.impostazioni.saldoIniziale = 10000;
+  const v = M.tuttiIMesi({ id: 'b', nome: 'Bollette', importo: -100, tipo: 'PERIODICO', mesi: [] }, 2026, true, 2028);
+  assert.equal(v.mesi.length, 36);
+  const r = M.proiezione(M.salvaVoce(s, v));
+  assert.equal(r.at(-1).saldoContabile, 10000 - 36 * 100);
+});
+
+test('allungare il periodo ripete le voci periodiche negli anni nuovi', () => {
+  const s = M.vuoto({ y: 2026, m: 1 });
+  s.impostazioni.fineAnno = 2027;
+  s.voci = [
+    { id: 'a', nome: 'RCA', importo: -450, tipo: 'PERIODICO', mesi: ['2026-03', '2027-03'] },
+    { id: 'e', nome: 'Lavatrice', importo: -450, tipo: 'EXTRA', anno: 2027, mesi: ['2027-05'] },
+  ];
+  const n = M.cambiaFineAnno(s, 2029);
+  assert.equal(n.impostazioni.fineAnno, 2029);
+  assert.deepEqual(n.voci[0].mesi, ['2026-03', '2027-03', '2028-03', '2029-03']);
+  assert.deepEqual(n.voci[1].mesi, ['2027-05']);
+  assert.deepEqual(M.cambiaFineAnno(s, 2026).voci, s.voci);
+});

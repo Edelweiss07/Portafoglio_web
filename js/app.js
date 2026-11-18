@@ -10,7 +10,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.1.0';
+export const VERSIONE_APP = '1.1.1';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -366,7 +366,7 @@ function paginaVoci() {
         <div class="totali-mesi">${totali.map((t, i) => `<div><span>${NOMI_MESI[i]}</span><strong class="${t != null ? classeImporto(t) : 'spento'}">${t == null ? '·' : compatto(t)}</strong></div>`).join('')}</div></section>
       <p class="nota">${tipo === 'EXTRA'
         ? `Spese o entrate una tantum del ${anno}: non si ripetono negli altri anni. Tocca un mese per inserirle nella proiezione.`
-        : 'Valgono per tutti gli anni; i mesi si attivano anno per anno. Scorri per cambiare anno.'}</p>
+        : 'Si ripetono negli anni: un mese attivato vale per l\'anno mostrato e per quelli successivi. Le spese di ogni mese (bollette, spesa…) vanno nelle Spese fisse, dai Parametri del mese in Proiezione.'}</p>
       ${voci.length ? '' : '<p class="vuoto">Nessuna voce in questo anno.</p>'}
       ${voci.map((v) => `<section class="scheda voce">
         <button type="button" class="voce-testa" data-modifica-voce="${esc(v.id)}"><span>${esc(v.nome || '(senza nome)')}</span>
@@ -423,7 +423,11 @@ function dialogoVoce(voce, annoPagina, nuova) {
           <button type="button" class="icona-btn" data-anno-voce-sposta="1" ${anno >= anni[anni.length - 1] ? 'disabled' : ''} aria-label="Anno successivo">${ICONE.destra}</button></div>`
         : `<p class="etichetta">Mesi ${anno}</p>`}
       ${grigliaMesi(lavoro, anno, 'data-mese-voce')}
+      ${lavoro.tipo === 'PERIODICO' ? `<p class="nota">I mesi che tocchi valgono per il ${anno} e per gli anni successivi.</p>` : ''}
+      <button type="button" class="btn btn-testo" data-tutti-mesi="on">Tutti i mesi</button>
+      <button type="button" class="btn btn-testo" data-tutti-mesi="off">Nessun mese</button>
       ${lavoro.tipo === 'PERIODICO' ? `<button type="button" class="btn btn-testo" data-copia-anno>Copia mesi dal ${anno - 1}</button>` : ''}
+      <p class="nota">Le spese di tutti i mesi (bollette, spesa, affitto…) vanno nelle Spese fisse, dai Parametri del mese in Proiezione.</p>
       ${nuova ? '' : '<button type="button" class="btn btn-testo pericolo" data-elimina-voce>Elimina voce</button>'}`;
   };
   disegna();
@@ -440,7 +444,8 @@ function dialogoVoce(voce, annoPagina, nuova) {
     const anno = annoVisto();
     if (t.dataset.tipo) lavoro = M.cambiaTipo(lavoro, t.dataset.tipo, anno);
     else if (t.dataset.annoVoceSposta) lavoro = M.cambiaAnno(lavoro, anno + Number(t.dataset.annoVoceSposta));
-    else if (t.dataset.meseVoce) lavoro = M.toggle(lavoro, { y: anno, m: Number(t.dataset.meseVoce) }, !t.classList.contains('on'));
+    else if (t.dataset.meseVoce) lavoro = M.toggle(lavoro, { y: anno, m: Number(t.dataset.meseVoce) }, !t.classList.contains('on'), stato.impostazioni.fineAnno);
+    else if (t.dataset.tuttiMesi) lavoro = M.tuttiIMesi(lavoro, anno, t.dataset.tuttiMesi === 'on', stato.impostazioni.fineAnno);
     else if (t.hasAttribute('data-copia-anno')) lavoro = M.copiaAnnoPrecedente(lavoro, anno);
     else if (t.hasAttribute('data-elimina-voce')) {
       conferma({
@@ -615,7 +620,8 @@ function collegaOpzioni() {
       inp.value = numero(i[k]);
       return;
     }
-    aggiorna({ ...stato, impostazioni: { ...i, [k]: v } });
+    if (k === 'fineAnno') aggiorna(M.cambiaFineAnno(stato, v));
+    else aggiorna({ ...stato, impostazioni: { ...i, [k]: v } });
   }));
   const box = vista.querySelector('#frasi-home');
   collegaEditorFrasi(box, () => stato.impostazioni.frasi, (nuove, ridisegna) => {
@@ -725,7 +731,7 @@ document.addEventListener('click', (ev) => {
     const box = t.closest('[data-voce]');
     const voce = stato.voci.find((v) => v.id === box.dataset.voce);
     const anno = Number(box.dataset.annoVoce);
-    aggiorna(M.salvaVoce(stato, M.toggle(voce, { y: anno, m: Number(t.dataset.toggle) }, !t.classList.contains('on'))));
+    aggiorna(M.salvaVoce(stato, M.toggle(voce, { y: anno, m: Number(t.dataset.toggle) }, !t.classList.contains('on'), stato.impostazioni.fineAnno)));
     return;
   }
   if (t.dataset.modificaVoce) {

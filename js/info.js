@@ -101,7 +101,7 @@ ${GRASSETTO}`],
 
   voci: ['Voci', `Le spese ed entrate che non arrivano ogni mese.
 
-• Periodiche: si ripetono negli anni (assicurazione, bollo, tredicesima). Valgono per tutti gli anni; i mesi si attivano anno per anno toccando i quadratini. "Copia mesi dall'anno precedente" ripete lo schema dell'anno prima.
+• Periodiche: si ripetono negli anni (assicurazione, bollo, tredicesima). Un mese attivato toccando i quadratini vale per l'anno mostrato e per tutti gli anni successivi; per cambiare solo un anno lontano, vai a quell'anno. "Tutti i mesi" li attiva in un colpo. Le spese che escono ogni mese (bollette, spesa, affitto) non vanno qui ma nelle Spese fisse, dai Parametri del mese.
 • Straordinarie: una tantum (un acquisto, un rimborso). Appartengono a un solo anno e non si ripetono.
 
 Importo negativo = uscita, positivo = entrata.

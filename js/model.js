@@ -332,12 +332,47 @@ export function salvaMese(s, ym, extra, rata, cambi, applica) {
   return Object.keys(cambi).length ? impostaCampi(n, ym, cambi, applica) : n;
 }
 
-export function toggle(voce, ym, on) {
+/**
+ * Attiva o disattiva un mese di una voce.
+ * Le voci periodiche si ripetono: se si passa fineAnno, il cambio vale per l'anno ym.y
+ * e per tutti gli anni successivi fino a fineAnno (gli anni precedenti restano com'erano).
+ */
+export function toggle(voce, ym, on, fineAnno) {
   if (voce.tipo === 'EXTRA' && voce.anno != null && voce.anno !== ym.y) return voce;
-  const k = chiave(ym.y, ym.m);
   const set = new Set(voce.mesi);
-  if (on) set.add(k); else set.delete(k);
+  const ultimo = voce.tipo === 'PERIODICO' && fineAnno > ym.y ? fineAnno : ym.y;
+  for (let y = ym.y; y <= ultimo; y++) {
+    const k = chiave(y, ym.m);
+    if (on) set.add(k); else set.delete(k);
+  }
   return { ...voce, mesi: [...set].sort() };
+}
+
+/** Attiva (o disattiva) tutti i 12 mesi dell'anno; per le periodiche anche negli anni successivi fino a fineAnno. */
+export function tuttiIMesi(voce, anno, on, fineAnno) {
+  let v = voce;
+  for (let m = 1; m <= 12; m++) v = toggle(v, { y: anno, m }, on, fineAnno);
+  return v;
+}
+
+/**
+ * Cambia l'ultimo anno del periodo. Se il periodo si allunga, le voci periodiche
+ * ripetono negli anni aggiunti i mesi attivi nel vecchio ultimo anno.
+ */
+export function cambiaFineAnno(s, nuovoFine) {
+  const vecchio = s.impostazioni.fineAnno;
+  const n = clona(s);
+  n.impostazioni.fineAnno = nuovoFine;
+  if (nuovoFine > vecchio) {
+    n.voci = n.voci.map((v) => {
+      if (v.tipo !== 'PERIODICO') return v;
+      const schema = v.mesi.filter((k) => k.startsWith(prefisso(vecchio))).map((k) => k.slice(5));
+      const nuovi = [];
+      for (let y = vecchio + 1; y <= nuovoFine; y++) schema.forEach((mm) => nuovi.push(prefisso(y) + mm));
+      return { ...v, mesi: [...new Set([...v.mesi, ...nuovi])].sort() };
+    });
+  }
+  return n;
 }
 
 const prefisso = (a) => `${String(a).padStart(4, '0')}-`;
