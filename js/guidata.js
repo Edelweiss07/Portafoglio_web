@@ -1,5 +1,6 @@
 // Compilazione guidata: domande passo passo per riempire Home, Voci e Salvadanai,
-// con esempi e suggerimenti. Parte quando l'app non contiene dati.
+// con esempi e suggerimenti. Parte quando l'app non contiene dati; se invece ci sono già dati,
+// le risposte sono precompilate con quelli (M.aCompilazione).
 import * as M from './model.js';
 import {
   ICONE, NOMI_MESI_LUNGHI, campo, campoTesto, conferma, esc, euro, parseNumero,
@@ -38,6 +39,12 @@ const VOCI_SPESA = [
   ['altro', 'Altre spese regolari (figli, animali, svago…)'],
 ];
 
+const nomeMese = (m) => NOMI_MESI_LUNGHI[m - 1].toLowerCase();
+/** Nota per le voci precompilate attive in più mesi dell'anno. */
+const notaAltriMesi = (v) => (v.altriMesi?.length
+  ? `<p class="nota">Anche a ${v.altriMesi.map(nomeMese).join(', ')}. Questi mesi restano; puoi cambiarli dopo, nella scheda Voci.</p>` : '');
+const stessoNome = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
 const consiglio = (t) => `<div class="consiglio"><strong>Suggerimento</strong><p>${t}</p></div>`;
 const esempio = (t) => `<div class="esempio"><strong>Esempio</strong><p>${t}</p></div>`;
 
@@ -45,7 +52,8 @@ function selectMese(attr, valore, etichetta = 'Mese') {
   return `<label class="campo"><span class="campo-etichetta">${etichetta}</span><select ${attr}>${NOMI_MESI_LUNGHI.map((n, i) =>
     `<option value="${i + 1}" ${i + 1 === valore ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`;
 }
-function selectAnno(attr, valore, anni, etichetta = 'Anno') {
+function selectAnno(attr, valore, anniProposti, etichetta = 'Anno') {
+  const anni = anniProposti.includes(valore) ? anniProposti : [...anniProposti, valore].sort((a, b) => a - b);
   return `<label class="campo"><span class="campo-etichetta">${etichetta}</span><select ${attr}>${anni.map((a) =>
     `<option value="${a}" ${a === valore ? 'selected' : ''}>${a}</option>`).join('')}</select></label>`;
 }
@@ -62,18 +70,27 @@ function scriviPercorso(o, p, v) {
 
 /**
  * Apre la compilazione guidata a tutto schermo.
- * opzioni: { oggi, onFine(stato), onImporta(), onEsci() }
+ * opzioni: { oggi, iniziale, onFine(stato), onImporta(), onEsci() }
+ * iniziale: risposte già date (da M.aCompilazione) per precompilare i passi; null se l'app è vuota.
  */
-export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
+export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci }) {
+  const precompilata = !!iniziale;
+  const modelliPeriodiche = MODELLI_PERIODICHE
+    .filter((m) => !iniziale?.periodiche.some((v) => stessoNome(v.nome, m.nome)))
+    .map((m) => ({ ...m, scelta: false }));
+  const modelliSalvadanai = MODELLI_SALVADANAI
+    .filter((m) => !iniziale?.salvadanai.some((v) => stessoNome(v.nome, m.nome)))
+    .map((m) => ({ ...m, scelta: false, saldo: 0, obiettivo: 0, scadenzaMese: 12, scadenzaAnno: oggi.y + 1 }));
   const w = {
     inizio: { ...oggi }, anni: 3,
     saldoIniziale: 0, residuo: 0, rata: 0,
     entrate: 0, spese: 0, valoreBuono: 0,
-    dettaglio: Object.fromEntries(VOCI_SPESA.map(([k]) => [k, 0])), usaDettaglio: false,
     corrente: { saldo: 0, nonAddebitato: 0, nonAccreditato: 0, buoniResidui: 0, welfare: 0, residuoCarte: 0 }, plafond: 0,
-    periodiche: MODELLI_PERIODICHE.map((m) => ({ ...m, scelta: false })),
     straordinarie: [],
-    salvadanai: MODELLI_SALVADANAI.map((m) => ({ ...m, scelta: false, saldo: 0, obiettivo: 0, scadenzaMese: 12, scadenzaAnno: oggi.y + 1 })),
+    ...iniziale,
+    dettaglio: Object.fromEntries(VOCI_SPESA.map(([k]) => [k, 0])), usaDettaglio: false,
+    periodiche: [...(iniziale?.periodiche ?? []), ...modelliPeriodiche],
+    salvadanai: [...(iniziale?.salvadanai ?? []), ...modelliSalvadanai],
   };
   const anniPeriodo = () => {
     const a = [];
@@ -96,11 +113,13 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
         <ul class="elenco"><li>quanto entra e quanto esce ogni mese;</li><li>quanti soldi hai adesso sul conto;</li>
         <li>le spese e le entrate che arrivano una o due volte l'anno (assicurazione, tredicesima…);</li>
         <li>i soldi che vuoi mettere da parte per un obiettivo (salvadanai).</li></ul>
-        ${consiglio('Tieni a portata di mano l\'app della banca e, se le hai, l\'ultima busta paga e le polizze. Se non sai un valore, metti una stima: potrai correggere tutto in qualsiasi momento.')}
+        ${precompilata
+    ? consiglio('Ho già inserito come risposte i dati che hai adesso nell\'app: controllali e cambia solo quello che serve. I valori che hai modificato mese per mese nella Proiezione restano. Alla fine i dati attuali vengono sostituiti da quelli confermati qui; se esci prima, non cambia nulla.')
+    : consiglio('Tieni a portata di mano l\'app della banca e, se le hai, l\'ultima busta paga e le polizze. Se non sai un valore, metti una stima: potrai correggere tutto in qualsiasi momento.')}
         <div class="scelte-avvio">
-          <button type="button" class="btn btn-primario pieno" data-g="avanti">Iniziamo</button>
+          <button type="button" class="btn btn-primario pieno" data-g="avanti">${precompilata ? 'Rivediamo le risposte' : 'Iniziamo'}</button>
           <button type="button" class="btn btn-contorno pieno" data-g="importa">Ho già un backup: importalo</button>
-          <button type="button" class="btn btn-testo pieno" data-g="esci">Salta: compilo da solo</button>
+          <button type="button" class="btn btn-testo pieno" data-g="esci">${precompilata ? 'Annulla: lascio i dati come sono' : 'Salta: compilo da solo'}</button>
         </div>`,
       senzaPiede: true,
     },
@@ -109,7 +128,7 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
       html: () => `<p>Da quale mese vuoi far partire la proiezione e per quanti anni?</p>
         <div class="due-colonne">${selectMese('data-ws="inizio.m"', w.inizio.m)}${selectAnno('data-ws="inizio.y"', w.inizio.y, [oggi.y - 1, oggi.y, oggi.y + 1], 'Anno di inizio')}</div>
         <label class="campo"><span class="campo-etichetta">Anni da pianificare dopo il primo</span>
-          <select data-ws="anni">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${n === w.anni ? 'selected' : ''}>${n} ${n === 1 ? 'anno' : 'anni'} (fino a dicembre ${w.inizio.y + n})</option>`).join('')}</select></label>
+          <select data-ws="anni">${[...new Set([1, 2, 3, 4, 5, w.anni])].sort((a, b) => a - b).map((n) => `<option value="${n}" ${n === w.anni ? 'selected' : ''}>${n} ${n === 1 ? 'anno' : 'anni'} (fino a dicembre ${w.inizio.y + n})</option>`).join('')}</select></label>
         ${consiglio('Parti dal mese corrente: è il modo più semplice. 3 anni bastano per vedere l\'effetto di tredicesime, vacanze e spese grandi; potrai allungare il periodo in Opzioni.')}`,
     },
     {
@@ -175,6 +194,7 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
             ${v.nota ? `<p class="nota">${esc(v.nota)}</p>` : ''}
             ${segmento(`data-entrata="periodiche.${i}"`, v.entrata)}
             <div class="due-colonne">${campo('Importo (€)', v.importo, `data-w="periodiche.${i}.importo"`)}${selectMese(`data-ws="periodiche.${i}.mese"`, v.mese)}</div>
+            ${notaAltriMesi(v)}
           </div>` : ''}</div>`).join('')}</div>
         <button type="button" class="btn btn-contorno pieno" data-g="nuova-periodica">${ICONE.piu}Aggiungi un'altra voce</button>
         ${consiglio('Scorri l\'estratto conto degli ultimi 12 mesi e cerca le uscite grandi che non tornano ogni mese. Gli importi suggeriti sono solo indicativi: metti i tuoi. Più mesi per la stessa voce (es. TARI in due rate) si aggiungono dopo, nella scheda Voci.')}`,
@@ -190,6 +210,7 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
           ${segmento(`data-entrata="straordinarie.${i}"`, v.entrata)}
           ${campo('Importo (€)', v.importo, `data-w="straordinarie.${i}.importo"`)}
           <div class="due-colonne">${selectMese(`data-ws="straordinarie.${i}.mese"`, v.mese)}${selectAnno(`data-ws="straordinarie.${i}.anno"`, v.anno, anni)}</div>
+          ${notaAltriMesi(v)}
         </section>`).join('')}
         <button type="button" class="btn btn-contorno pieno" data-g="nuova-straordinaria">${ICONE.piu}Aggiungi una voce una tantum</button>
         ${esempio('"Lavatrice nuova", uscita di 450 € a marzo; "Anticipo auto", uscita di 3.000 € a settembre del prossimo anno.')}
@@ -212,6 +233,7 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
             ${campo('Obiettivo da raggiungere (€)', v.obiettivo, `data-w="salvadanai.${i}.obiettivo"`,
               v.nome === 'Fondo emergenze' && fondoConsigliato ? `Consigliato: almeno 3 mesi di spese fisse = ${euro(fondoConsigliato)}` : 'Lascia vuoto se non hai un obiettivo')}
             <div class="due-colonne">${selectMese(`data-ws="salvadanai.${i}.scadenzaMese"`, v.scadenzaMese, 'Entro il mese')}${selectAnno(`data-ws="salvadanai.${i}.scadenzaAnno"`, v.scadenzaAnno, anni, 'Entro l\'anno')}</div>
+            ${v.senzaScadenza ? '<p class="nota">Ora non ha una scadenza: resta così finché non scegli mese o anno.</p>' : ''}
             <div id="g-quota-${i}"></div>
           </div>` : ''}</div>`).join('')}</div>
         <button type="button" class="btn btn-contorno pieno" data-g="nuovo-salvadanaio">${ICONE.piu}Aggiungi un altro salvadanaio</button>
@@ -225,7 +247,8 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
           const mancano = Math.max(0, (v.obiettivo || 0) - (v.saldo || 0));
           const mesi = Math.max(0, M.indice({ y: v.scadenzaAnno, m: v.scadenzaMese }) - M.indice(oggi));
           let t = '';
-          if (v.obiettivo > 0 && mancano === 0) t = '<p class="nota">Obiettivo già raggiunto!</p>';
+          if (v.senzaScadenza) t = '';
+          else if (v.obiettivo > 0 && mancano === 0) t = '<p class="nota">Obiettivo già raggiunto!</p>';
           else if (v.obiettivo > 0 && mesi > 0) {
             const quota = mancano / mesi;
             const utile = w.entrate - w.spese;
@@ -334,6 +357,10 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
     const t = ev.target;
     if (!t.dataset.ws) return;
     scriviPercorso(w, t.dataset.ws, Number(t.value));
+    if (/\.scadenza(Mese|Anno)$/.test(t.dataset.ws)) {
+      const sv = leggiPercorso(w, t.dataset.ws.replace(/\.scadenza(Mese|Anno)$/, ''));
+      if (sv.senzaScadenza) { sv.senzaScadenza = false; disegna(false); return; }
+    }
     // il periodo cambia gli anni proposti negli altri passi
     if (t.dataset.ws.startsWith('inizio') || t.dataset.ws === 'anni') disegna(false);
     else aggiornaLive();
@@ -373,7 +400,9 @@ export function avviaGuidata({ oggi, onFine, onImporta, onEsci }) {
         if (passo === 0) { chiudi(); onEsci(); break; }
         conferma({
           titolo: 'Uscire dalla compilazione guidata?',
-          testo: 'Le risposte date finora non verranno salvate. Potrai ricominciare dalle Opzioni.',
+          testo: precompilata
+            ? 'Le modifiche fatte qui non verranno salvate: i tuoi dati restano come sono. Potrai ricominciare dalle Opzioni.'
+            : 'Le risposte date finora non verranno salvate. Potrai ricominciare dalle Opzioni.',
           ok: 'Esci', pericolo: true,
           onOk: () => { chiudi(); onEsci(); },
         });

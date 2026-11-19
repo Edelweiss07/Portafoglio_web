@@ -2,15 +2,18 @@
 import * as M from './model.js';
 import { esportaXlsx } from './esporta.js';
 import { avviaGuidata } from './guidata.js';
+import {
+  descrizioneModo, impostaModo, modoDestinazione, nomeCartella, salvaFile, scegliCartella, supporto,
+} from './salvataggio.js';
 import { INFO, RISCHI_BACKUP } from './info.js';
 import { COLORI, graficoBarre, graficoLinee } from './grafici.js';
 import {
   ICONE, NOMI_MESI, NOMI_MESI_LUNGHI, apriInfo, apriModale, avviso, campo, campoTesto, classeImporto,
-  collegaEditorFrasi, conferma, editorFrasi, esc, euro, numero, parseNumero, riga, rigaValore, salvaFile,
+  collegaEditorFrasi, conferma, editorFrasi, esc, euro, numero, parseNumero, riga, rigaValore,
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.1.1';
+export const VERSIONE_APP = '1.2.0';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -584,6 +587,31 @@ function ultimoBackupTxt() {
   return `Ultimo backup esportato: ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}${giorni > 0 ? ` (${giorni} ${giorni === 1 ? 'giorno' : 'giorni'} fa)` : ' (oggi)'}.`;
 }
 
+function sceltaDestinazione() {
+  const modo = modoDestinazione();
+  const opzioni = [['download', 'Download'],
+    ...(supporto.cartella ? [['cartella', modo === 'cartella' ? 'Cambia cartella' : 'Una cartella…']] : []),
+    ...(supporto.chiedi ? [['chiedi', 'Chiedi ogni volta']] : [])];
+  return `<p class="etichetta">Dove salvare i file esportati</p>
+    ${opzioni.length > 1 ? `<div class="chips piccoli scelta-destinazione">${opzioni.map(([k, t]) =>
+    `<button type="button" data-destinazione="${k}" class="${k === modo ? 'on' : ''}" aria-pressed="${k === modo}">${esc(t)}</button>`).join('')}</div>` : ''}
+    <p class="nota">${esc(descrizioneModo(modo))}</p>`;
+}
+
+async function cambiaDestinazione(modo) {
+  if (modo === 'cartella') {
+    try {
+      const nome = await scegliCartella();
+      if (nome) avviso(`I file verranno salvati in "${nome}"`);
+    } catch (e) {
+      avviso('Non è possibile usare questa cartella: scegline un\'altra.');
+    }
+  } else {
+    impostaModo(modo);
+  }
+  if (ui.pagina === 'opzioni') render();
+}
+
 function paginaOpzioni() {
   const i = stato.impostazioni;
   return `<div class="contenuto">
@@ -598,7 +626,8 @@ function paginaOpzioni() {
       <button type="button" class="btn btn-primario pieno" data-azione="esporta-backup">Esporta backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="importa-backup">Importa backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="esporta-excel">Esporta in Excel (.xlsx)</button>
-      <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>`, { info: 'backup' })}
+      <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>
+      ${sceltaDestinazione()}`, { info: 'backup' })}
     ${sezione('Reset', `<p class="nota">Cancella voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata.</p>
       <button type="button" class="btn btn-pericolo pieno" data-azione="cancella-tutto">Cancella tutti i dati</button>`, { info: 'reset' })}
     <p class="nota centro">Portafoglio – versione ${VERSIONE_APP} (web)</p>
@@ -642,19 +671,22 @@ const dopoRender = {
 
 const dataFile = () => new Date().toISOString().slice(0, 10);
 
+const msgSalvato = (cosa, dove) => (dove === 'condiviso' ? `${cosa} esportato` : `${cosa} salvato ${dove}`);
+
 async function esportaBackup() {
-  const ok = await salvaFile(JSON.stringify(stato, null, 2), `portafoglio-${dataFile()}.json`, 'application/json');
-  if (ok) {
+  const dove = await salvaFile(JSON.stringify(stato, null, 2), `portafoglio-${dataFile()}.json`, 'application/json');
+  if (dove) {
     localStorage.setItem(CHIAVE_BACKUP, new Date().toISOString());
-    avviso('Backup esportato');
+    avviso(msgSalvato('Backup', dove));
     if (ui.pagina === 'opzioni') render();
   }
-  return ok;
+  return !!dove;
 }
 
 async function esportaExcel() {
-  await salvaFile(esportaXlsx(stato, oggi()), `portafoglio-${dataFile()}.xlsx`,
+  const dove = await salvaFile(esportaXlsx(stato, oggi()), `portafoglio-${dataFile()}.xlsx`,
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  if (dove) avviso(msgSalvato('File Excel', dove));
 }
 
 function importaBackup() {
@@ -690,6 +722,8 @@ function importaBackup() {
 function apriGuidata() {
   avviaGuidata({
     oggi: oggi(),
+    // con dati già presenti le risposte partono da quelli
+    iniziale: M.eVuoto(stato) ? null : M.aCompilazione(stato, oggi()),
     onFine: (nuovo) => {
       ui.chiusura = null;
       ui.anno = { proiezione: null, voci: null, salvadanai: null };
@@ -741,6 +775,7 @@ document.addEventListener('click', (ev) => {
   }
   if (t.dataset.modificaSalv) { dialogoSalvadanaio(stato.salvadanai.find((x) => x.id === t.dataset.modificaSalv), false); return; }
   if (t.dataset.valoreSalv) { dialogoValoreSalvadanaio(t.dataset.valoreSalv, t.dataset.mese); return; }
+  if (t.dataset.destinazione) { cambiaDestinazione(t.dataset.destinazione); return; }
   switch (t.dataset.azione) {
     case 'parametri': dialogoMese(t.dataset.mese); break;
     case 'nascondi-chiusura': ui.chiusura = null; render(); break;
@@ -757,17 +792,8 @@ document.addEventListener('click', (ev) => {
     case 'esporta-backup': esportaBackup(); break;
     case 'importa-backup': importaBackup(); break;
     case 'esporta-excel': esportaExcel(); break;
-    case 'guidata':
-      if (M.eVuoto(stato)) apriGuidata();
-      else {
-        conferma({
-          titolo: 'Ricominciare con la compilazione guidata?',
-          testo: 'Alla fine della compilazione i dati attuali verranno sostituiti da quelli nuovi. Se vuoi conservarli, esporta prima un backup.',
-          ok: 'Inizia', pericolo: true,
-          onOk: apriGuidata,
-        });
-      }
-      break;
+    // con dati presenti la compilazione è precompilata e uscendo non cambia nulla: niente conferma
+    case 'guidata': apriGuidata(); break;
     case 'cancella-tutto':
       conferma({
         titolo: 'Cancellare tutti i dati?',

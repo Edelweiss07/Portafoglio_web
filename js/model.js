@@ -65,6 +65,10 @@ export function eVuoto(s) {
 /**
  * Crea lo stato dalle risposte della compilazione guidata.
  * Gli importi delle voci sono positivi; "entrata" ne decide il segno.
+ * Campi facoltativi (presenti quando la compilazione parte da dati esistenti, vedi aCompilazione):
+ *  - voci e salvadanai: id (conservato), altriMesi (altri mesi oltre a "mese"), frasi, senzaScadenza;
+ *  - frasi: frasi della Home;
+ *  - mesiPrecedenti: valori inseriti mese per mese, conservati per i mesi successivi all'inizio.
  */
 export function daCompilazione(r, oggi) {
   const inizio = r.inizio;
@@ -75,24 +79,39 @@ export function daCompilazione(r, oggi) {
     inizioAnno: inizio.y, inizioMese: inizio.m, fineAnno,
     saldoIniziale: r.saldoIniziale || 0, residuoIniziale: r.residuo || 0, plafondCarte: r.plafond || 0,
   };
+  if (Array.isArray(r.frasi)) s.impostazioni.frasi = clona(r.frasi);
   s.saldoCorrente = {
     saldo: r.corrente?.saldo || 0, nonAddebitato: r.corrente?.nonAddebitato || 0,
     nonAccreditato: r.corrente?.nonAccreditato || 0, buoniResidui: r.corrente?.buoniResidui || 0,
     welfare: r.corrente?.welfare || 0, residuoCarte: r.corrente?.residuoCarte || 0,
   };
-  const segno = (v) => (v.entrata ? 1 : -1) * Math.abs(v.importo || 0);
+  // id: quelli esistenti restano, i nuovi non devono coincidere con nessuno di loro
+  const usati = new Set([...(r.periodiche || []), ...(r.straordinarie || []), ...(r.salvadanai || [])]
+    .map((x) => x.id).filter(Boolean));
   let n = 0;
+  const nuovoId = (p) => {
+    let id;
+    do id = `${p}${n++}`; while (usati.has(id));
+    usati.add(id);
+    return id;
+  };
+  const mesiAnno = (v) => [...new Set([v.mese, ...(v.altriMesi || [])])]
+    .filter((m) => m >= 1 && m <= 12).sort((a, b) => a - b);
+  const segno = (v) => (v.entrata ? 1 : -1) * Math.abs(v.importo || 0);
   for (const v of r.periodiche || []) {
     if (!v.nome?.trim() || !v.importo) continue;
     const mesi = [];
     for (let y = inizio.y; y <= fineAnno; y++) {
-      if (indice({ y, m: v.mese }) >= indice(inizio)) mesi.push(chiave(y, v.mese));
+      for (const m of mesiAnno(v)) if (indice({ y, m }) >= indice(inizio)) mesi.push(chiave(y, m));
     }
-    s.voci.push({ id: `p${n++}`, nome: v.nome.trim(), importo: segno(v), tipo: 'PERIODICO', mesi });
+    s.voci.push({ id: v.id || nuovoId('p'), nome: v.nome.trim(), importo: segno(v), tipo: 'PERIODICO', mesi });
   }
   for (const v of r.straordinarie || []) {
     if (!v.nome?.trim() || !v.importo) continue;
-    s.voci.push({ id: `e${n++}`, nome: v.nome.trim(), importo: segno(v), tipo: 'EXTRA', mesi: [chiave(v.anno, v.mese)], anno: v.anno });
+    s.voci.push({
+      id: v.id || nuovoId('e'), nome: v.nome.trim(), importo: segno(v), tipo: 'EXTRA',
+      mesi: mesiAnno(v).map((m) => chiave(v.anno, m)), anno: v.anno,
+    });
   }
   const primo = { extra: 0 };
   if (r.entrate) primo.entrate = r.entrate;
@@ -100,18 +119,86 @@ export function daCompilazione(r, oggi) {
   if (r.valoreBuono) primo.valoreBuono = r.valoreBuono;
   if (r.rata) primo.rata = r.rata;
   const salv = {};
-  (r.salvadanai || []).filter((x) => x.nome?.trim()).forEach((x, i) => {
-    const id = `s${i}`;
-    const sv = { id, nome: x.nome.trim(), frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) };
+  (r.salvadanai || []).filter((x) => x.nome?.trim()).forEach((x) => {
+    const id = x.id || nuovoId('s');
+    const sv = { id, nome: x.nome.trim(), frasi: clona(Array.isArray(x.frasi) ? x.frasi : FRASI_SALVADANAIO_PREDEFINITE) };
     if (x.obiettivo > 0) sv.obiettivo = x.obiettivo;
-    if (x.scadenzaMese >= 1 && x.scadenzaMese <= 12 && x.scadenzaAnno >= 2000) sv.scadenza = chiave(x.scadenzaAnno, x.scadenzaMese);
+    if (!x.senzaScadenza && x.scadenzaMese >= 1 && x.scadenzaMese <= 12 && x.scadenzaAnno >= 2000) {
+      sv.scadenza = chiave(x.scadenzaAnno, x.scadenzaMese);
+    }
     s.salvadanai.push(sv);
     salv[id] = x.saldo || 0;
   });
   if (Object.keys(salv).length) primo.salvadanai = salv;
   const k = chiave(inizio.y, inizio.m);
-  if (!meseVuoto(primo)) s.mesi[k] = primo;
+  // valori inseriti mese per mese: restano quelli dei mesi dopo l'inizio e l'Extra del primo mese
+  if (r.mesiPrecedenti) {
+    const ids = new Set(s.salvadanai.map((x) => x.id));
+    for (const [km, m] of Object.entries(r.mesiPrecedenti)) {
+      if (!/^\d{4}-\d{2}$/.test(km) || km < k) continue;
+      if (km === k) {
+        primo.extra = m.extra || 0;
+        continue;
+      }
+      const copia = clona(m);
+      if (copia.salvadanai) {
+        copia.salvadanai = Object.fromEntries(Object.entries(copia.salvadanai).filter(([id]) => ids.has(id)));
+        if (!Object.keys(copia.salvadanai).length) delete copia.salvadanai;
+      }
+      conMese(s, km, copia);
+    }
+  }
+  conMese(s, k, primo);
   return s;
+}
+
+/**
+ * Il contrario di daCompilazione: dalle impostazioni e dai dati attuali ricava le risposte
+ * della compilazione guidata, per precompilarla. Voci e salvadanai mantengono id e dettagli,
+ * così rifare la compilazione senza cambiare nulla restituisce gli stessi calcoli.
+ */
+export function aCompilazione(s, oggi) {
+  const imp = s.impostazioni;
+  const inizio = { y: imp.inizioAnno, m: imp.inizioMese };
+  const primo = proiezione(s)[0];
+  // mesi dell'anno in cui la voce è attiva, dal più frequente
+  const mesiDellAnno = (v) => {
+    const conta = new Map();
+    for (const k of v.mesi) {
+      const { m } = parseChiave(k);
+      conta.set(m, (conta.get(m) || 0) + 1);
+    }
+    return [...conta.keys()].sort((a, b) => conta.get(b) - conta.get(a) || a - b);
+  };
+  const daVoce = (v) => {
+    const [mese = inizio.m, ...altri] = mesiDellAnno(v);
+    return {
+      id: v.id, nome: v.nome, importo: Math.abs(v.importo), entrata: v.importo > 0,
+      mese, altriMesi: altri.sort((a, b) => a - b), personale: true, nota: '',
+    };
+  };
+  const periodiche = s.voci.filter((v) => v.tipo === 'PERIODICO')
+    .map((v) => ({ ...daVoce(v), scelta: v.mesi.length > 0 && v.importo !== 0 }));
+  const straordinarie = s.voci.filter((v) => v.tipo === 'EXTRA' && v.importo !== 0).map((v) => ({
+    ...daVoce(v), anno: v.anno ?? (v.mesi[0] ? parseChiave(v.mesi[0]).y : inizio.y),
+  }));
+  const salvadanai = s.salvadanai.map((sv) => {
+    const sc = sv.scadenza && /^\d{4}-\d{2}$/.test(sv.scadenza) ? parseChiave(sv.scadenza) : null;
+    return {
+      id: sv.id, nome: sv.nome, nota: '', scelta: true, personale: true,
+      saldo: primo?.salvadanai[sv.id] ?? 0, obiettivo: sv.obiettivo || 0,
+      scadenzaMese: sc?.m ?? 12, scadenzaAnno: sc?.y ?? oggi.y + 1, senzaScadenza: !sc,
+      frasi: clona(sv.frasi || FRASI_SALVADANAIO_PREDEFINITE),
+    };
+  });
+  return {
+    inizio, anni: Math.max(1, imp.fineAnno - imp.inizioAnno),
+    saldoIniziale: imp.saldoIniziale, residuo: imp.residuoIniziale, rata: primo?.rata ?? 0,
+    entrate: primo?.entrate ?? 0, spese: primo?.spese ?? 0, valoreBuono: primo?.valoreBuono ?? 0,
+    corrente: { ...s.saldoCorrente }, plafond: imp.plafondCarte,
+    periodiche, straordinarie, salvadanai,
+    frasi: clona(imp.frasi), mesiPrecedenti: clona(s.mesi),
+  };
 }
 
 // ---------- Mesi inseriti a mano ----------

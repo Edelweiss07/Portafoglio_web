@@ -343,3 +343,4 @@ p { margin: 6px 0; }
 .chips.piccoli button { padding: 6px 12px; font-size: 0.9rem; }
 .dettaglio-spese { border: 1px solid var(--bordo); border-radius: 12px; padding: 4px 12px; margin: 8px 0; }
 .voce-guidata { margin: 10px auto; }
+.scelta-destinazione { flex-wrap: wrap; }

@@ -1,6 +1,6 @@
 // Service worker: rende l'app disponibile anche senza internet.
 // A ogni nuova versione cambia VERSIONE: il browser scarica i file nuovi e l'app si ricarica da sola.
-const VERSIONE = 'portafoglio-web-1.1.1';
+const VERSIONE = 'portafoglio-web-1.2.0';
 const FILE = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const FILE = [
   './js/xlsx.js',
   './js/esporta.js',
   './js/guidata.js',
+  './js/salvataggio.js',
   './icone/icona-192.png',
   './icone/icona-512.png',
   './icone/icona-maskable-512.png',

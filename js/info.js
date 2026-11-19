@@ -164,7 +164,8 @@ ${SMART}`],
 • Esporta backup: salva tutti i dati in un file .json.
 • Importa backup: sostituisce i dati attuali con quelli del file (anche un backup fatto con l'app Android).
 • Esporta in Excel: crea un foglio di calcolo (.xlsx) con Home, Proiezione mese per mese, Voci, Salvadanai e Impostazioni. Si apre con Excel, Numbers o Google Fogli. È solo una copia da consultare: non si può reimportare.
-• Compilazione guidata: ti fa le domande passo passo per creare di nuovo il Portafoglio; alla fine sostituisce i dati attuali.`],
+• Compilazione guidata: ti fa le domande passo passo per creare di nuovo il Portafoglio. Se ci sono già dati, le risposte sono precompilate con quelli: cambi solo quello che serve. Alla fine sostituisce i dati attuali; se esci prima, non cambia nulla.
+• Dove salvare i file esportati: Download (predefinito), una cartella scelta da te (Chrome ed Edge su computer) oppure chiedi ogni volta. La scelta vale solo per questo dispositivo.`],
 
   reset: ['Reset', 'Cancella tutti i dati: voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata per ricominciare. L\'operazione non si può annullare: esporta prima un backup se vuoi conservarli.'],
 };

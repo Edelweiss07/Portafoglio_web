@@ -217,3 +217,55 @@ test('allungare il periodo ripete le voci periodiche negli anni nuovi', () => {
   assert.deepEqual(n.voci[1].mesi, ['2027-05']);
   assert.deepEqual(M.cambiaFineAnno(s, 2026).voci, s.voci);
 });
+
+test('compilazione guidata precompilata: senza modifiche restituisce gli stessi calcoli', () => {
+  const s = stato();
+  s.impostazioni.fineAnno = 2028;
+  s.voci.push({ id: 't', nome: 'TARI', importo: -125, tipo: 'PERIODICO', mesi: ['2026-05', '2026-11', '2027-05', '2027-11', '2028-05', '2028-11'] });
+  s.voci[0].mesi = ['2026-02', '2027-02', '2028-02'];
+  s.salvadanai[0].obiettivo = 1000;
+  s.salvadanai[0].scadenza = '2027-06';
+  s.salvadanai[1].frasi = [{ soglia: 0, testo: 'Mia frase' }];
+  s.impostazioni.frasi = [{ soglia: 0, testo: 'Frase personale' }];
+  const oggi = { y: 2026, m: 4 };
+  const r = M.aCompilazione(s, oggi);
+  assert.deepEqual(r.inizio, { y: 2026, m: 1 });
+  assert.equal(r.anni, 2);
+  assert.equal(r.entrate, 2000);
+  assert.equal(r.rata, 100);
+  const tari = r.periodiche.find((v) => v.nome === 'TARI');
+  assert.deepEqual([tari.mese, tari.altriMesi, tari.entrata, tari.importo], [5, [11], false, 125]);
+  assert.equal(r.salvadanai[1].senzaScadenza, true);
+
+  const n = M.daCompilazione(r, oggi);
+  const a = M.proiezione(s);
+  const b = M.proiezione(n);
+  assert.equal(a.length, b.length);
+  a.forEach((x, i) => {
+    vicino(b[i].saldoContabile, x.saldoContabile);
+    vicino(b[i].saldoNettoTotale, x.saldoNettoTotale);
+  });
+  const perId = (st) => Object.fromEntries(st.voci.map((v) => [v.id, v]));
+  assert.deepEqual(perId(n), perId(s));
+  assert.equal(n.salvadanai[0].scadenza, '2027-06');
+  assert.equal(n.salvadanai[1].scadenza, undefined);
+  assert.deepEqual(n.salvadanai[1].frasi, s.salvadanai[1].frasi);
+  assert.deepEqual(n.impostazioni.frasi, s.impostazioni.frasi);
+  assert.deepEqual(n.saldoCorrente, s.saldoCorrente);
+  const { '2026-01': primoN, ...restoN } = n.mesi;
+  const { '2026-01': primoS, ...restoS } = s.mesi;
+  assert.deepEqual(restoN, restoS);
+  assert.deepEqual({ ...primoN, salvadanai: undefined }, { ...primoS, salvadanai: undefined });
+});
+
+test('compilazione precompilata: salvadanaio tolto e voci nuove senza id in conflitto', () => {
+  const s = stato();
+  const r = M.aCompilazione(s, { y: 2026, m: 1 });
+  r.salvadanai = r.salvadanai.filter((x) => x.id !== 'y');
+  r.periodiche.push({ nome: 'Nuova', importo: 10, mese: 7 });
+  r.salvadanai.push({ nome: 'Nuovo', saldo: 5 });
+  const n = M.daCompilazione(r, { y: 2026, m: 1 });
+  assert.deepEqual(n.mesi['2026-04'].salvadanai, { x: 300 });
+  const ids = [...n.voci, ...n.salvadanai].map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length);
+});

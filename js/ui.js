@@ -199,32 +199,3 @@ export function collegaEditorFrasi(radice, getFrasi, onChange, predefinite, pass
     onChange(frasi, true);
   });
 }
-
-// ---------- Scaricare o condividere un file ----------
-
-const eIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-/** Salva un file: su iPhone con il foglio di condivisione (Salva su File), altrove come download. */
-export async function salvaFile(dati, nome, tipo) {
-  const blob = new Blob([dati], { type: tipo });
-  if (eIOS() && navigator.canShare) {
-    const file = new File([blob], nome, { type: tipo });
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: nome });
-        return true;
-      } catch (e) {
-        if (e && e.name === 'AbortError') return false;
-      }
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = nome;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  return true;
-}
