@@ -2,9 +2,7 @@
 import * as M from './model.js';
 import { esportaXlsx } from './esporta.js';
 import { avviaGuidata } from './guidata.js';
-import {
-  descrizioneModo, impostaModo, modoDestinazione, nomeCartella, salvaFile, scegliCartella, supporto,
-} from './salvataggio.js';
+import { salvaFile } from './salvataggio.js';
 import { INFO, RISCHI_BACKUP } from './info.js';
 import { COLORI, graficoBarre, graficoLinee } from './grafici.js';
 import {
@@ -13,7 +11,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.2.0';
+export const VERSIONE_APP = '1.2.1';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -587,31 +585,6 @@ function ultimoBackupTxt() {
   return `Ultimo backup esportato: ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}${giorni > 0 ? ` (${giorni} ${giorni === 1 ? 'giorno' : 'giorni'} fa)` : ' (oggi)'}.`;
 }
 
-function sceltaDestinazione() {
-  const modo = modoDestinazione();
-  const opzioni = [['download', 'Download'],
-    ...(supporto.cartella ? [['cartella', modo === 'cartella' ? 'Cambia cartella' : 'Una cartella…']] : []),
-    ...(supporto.chiedi ? [['chiedi', 'Chiedi ogni volta']] : [])];
-  return `<p class="etichetta">Dove salvare i file esportati</p>
-    ${opzioni.length > 1 ? `<div class="chips piccoli scelta-destinazione">${opzioni.map(([k, t]) =>
-    `<button type="button" data-destinazione="${k}" class="${k === modo ? 'on' : ''}" aria-pressed="${k === modo}">${esc(t)}</button>`).join('')}</div>` : ''}
-    <p class="nota">${esc(descrizioneModo(modo))}</p>`;
-}
-
-async function cambiaDestinazione(modo) {
-  if (modo === 'cartella') {
-    try {
-      const nome = await scegliCartella();
-      if (nome) avviso(`I file verranno salvati in "${nome}"`);
-    } catch (e) {
-      avviso('Non è possibile usare questa cartella: scegline un\'altra.');
-    }
-  } else {
-    impostaModo(modo);
-  }
-  if (ui.pagina === 'opzioni') render();
-}
-
 function paginaOpzioni() {
   const i = stato.impostazioni;
   return `<div class="contenuto">
@@ -626,8 +599,7 @@ function paginaOpzioni() {
       <button type="button" class="btn btn-primario pieno" data-azione="esporta-backup">Esporta backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="importa-backup">Importa backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="esporta-excel">Esporta in Excel (.xlsx)</button>
-      <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>
-      ${sceltaDestinazione()}`, { info: 'backup' })}
+      <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>`, { info: 'backup' })}
     ${sezione('Reset', `<p class="nota">Cancella voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata.</p>
       <button type="button" class="btn btn-pericolo pieno" data-azione="cancella-tutto">Cancella tutti i dati</button>`, { info: 'reset' })}
     <p class="nota centro">Portafoglio – versione ${VERSIONE_APP} (web)</p>
@@ -775,7 +747,6 @@ document.addEventListener('click', (ev) => {
   }
   if (t.dataset.modificaSalv) { dialogoSalvadanaio(stato.salvadanai.find((x) => x.id === t.dataset.modificaSalv), false); return; }
   if (t.dataset.valoreSalv) { dialogoValoreSalvadanaio(t.dataset.valoreSalv, t.dataset.mese); return; }
-  if (t.dataset.destinazione) { cambiaDestinazione(t.dataset.destinazione); return; }
   switch (t.dataset.azione) {
     case 'parametri': dialogoMese(t.dataset.mese); break;
     case 'nascondi-chiusura': ui.chiusura = null; render(); break;

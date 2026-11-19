@@ -12,9 +12,9 @@ Voci periodiche e straordinarie, Salvadanai con obiettivi, frasi motivazionali, 
   (voci, salvadanai, frasi e valori inseriti mese per mese restano). Non ci sono più dati di esempio.
 - **Richiesta di backup a ogni avvio**, con la spiegazione dei rischi di perdere i dati.
 - **Esportazione in Excel** (.xlsx) con 5 fogli: Home, Proiezione, Voci, Salvadanai, Impostazioni.
-- **Destinazione dei file esportati** (Opzioni → Backup ed esportazione): cartella **Download** (predefinita),
-  una **cartella scelta** una volta (Chrome ed Edge su computer) oppure **chiedi ogni volta**
-  (finestra "Salva con nome" o menu Condividi). La scelta vale per il dispositivo e non finisce nel backup.
+- **Scelta di dove salvare** a ogni esportazione (backup ed Excel): su computer la finestra "Salva con nome",
+  che parte da Download (Chrome ed Edge); su telefono il menu Condividi (Salva su File, Drive, e-mail…).
+  Se il browser non permette nessuna delle due, il file va nella cartella Download.
 
 I dati restano **solo sul dispositivo** (memoria del browser). Il formato di backup è lo stesso dell'app
 Android: un backup esportato da una delle due si importa nell'altra.
@@ -81,7 +81,7 @@ js/model.js           motore di calcolo (stesse regole dell'app Android)
 js/app.js             schermate e dialoghi
 js/ui.js, js/grafici.js, js/info.js   componenti, grafici, testi dei pulsanti ⓘ
 js/xlsx.js, js/esporta.js             esportazione in Excel
-js/salvataggio.js     dove salvare i file esportati (Download, cartella scelta, chiedi)
+js/salvataggio.js     salvataggio dei file esportati (chiede dove salvare)
 js/guidata.js         compilazione guidata
 icone/                icone dell'app
 test/model.test.mjs   test del motore (node --test test/model.test.mjs)
