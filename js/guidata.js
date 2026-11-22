@@ -13,7 +13,7 @@ const MODELLI_PERIODICHE = [
   { nome: 'Assicurazione auto (RCA)', importo: 450, mese: 3, entrata: false, nota: 'Guarda la scadenza sulla polizza.' },
   { nome: 'Bollo auto', importo: 200, mese: 2, entrata: false, nota: 'Il mese dipende dalla data di immatricolazione.' },
   { nome: 'Revisione e tagliando auto', importo: 300, mese: 9, entrata: false, nota: '' },
-  { nome: 'TARI (rifiuti)', importo: 250, mese: 5, entrata: false, nota: 'Spesso in 2 rate: dopo puoi aggiungere il secondo mese in Voci.' },
+  { nome: 'TARI (rifiuti)', importo: 250, mese: 5, entrata: false, nota: 'Spesso in 2 rate: dopo puoi aggiungere il secondo mese in Impostazioni → Voci.' },
   { nome: 'IMU', importo: 300, mese: 6, entrata: false, nota: 'Di solito solo per seconde case; acconto a giugno, saldo a dicembre.' },
   { nome: 'Manutenzione caldaia', importo: 100, mese: 10, entrata: false, nota: '' },
   { nome: 'Abbonamenti annuali', importo: 300, mese: 9, entrata: false, nota: 'Palestra, streaming, software…' },
@@ -42,7 +42,7 @@ const VOCI_SPESA = [
 const nomeMese = (m) => NOMI_MESI_LUNGHI[m - 1].toLowerCase();
 /** Nota per le voci precompilate attive in più mesi dell'anno. */
 const notaAltriMesi = (v) => (v.altriMesi?.length
-  ? `<p class="nota">Anche a ${v.altriMesi.map(nomeMese).join(', ')}. Questi mesi restano; puoi cambiarli dopo, nella scheda Voci.</p>` : '');
+  ? `<p class="nota">Anche a ${v.altriMesi.map(nomeMese).join(', ')}. Questi mesi restano; puoi cambiarli dopo, in Impostazioni → Voci.</p>` : '');
 const stessoNome = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const consiglio = (t) => `<div class="consiglio"><strong>Suggerimento</strong><p>${t}</p></div>`;
@@ -129,7 +129,7 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
         <div class="due-colonne">${selectMese('data-ws="inizio.m"', w.inizio.m)}${selectAnno('data-ws="inizio.y"', w.inizio.y, [oggi.y - 1, oggi.y, oggi.y + 1], 'Anno di inizio')}</div>
         <label class="campo"><span class="campo-etichetta">Anni da pianificare dopo il primo</span>
           <select data-ws="anni">${[...new Set([1, 2, 3, 4, 5, w.anni])].sort((a, b) => a - b).map((n) => `<option value="${n}" ${n === w.anni ? 'selected' : ''}>${n} ${n === 1 ? 'anno' : 'anni'} (fino a dicembre ${w.inizio.y + n})</option>`).join('')}</select></label>
-        ${consiglio('Parti dal mese corrente: è il modo più semplice. 3 anni bastano per vedere l\'effetto di tredicesime, vacanze e spese grandi; potrai allungare il periodo in Opzioni.')}`,
+        ${consiglio('Parti dal mese corrente: è il modo più semplice. 3 anni bastano per vedere l\'effetto di tredicesime, vacanze e spese grandi; potrai allungare il periodo in Impostazioni.')}`,
     },
     {
       titolo: 'Da dove parti',
@@ -197,7 +197,7 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
             ${notaAltriMesi(v)}
           </div>` : ''}</div>`).join('')}</div>
         <button type="button" class="btn btn-contorno pieno" data-g="nuova-periodica">${ICONE.piu}Aggiungi un'altra voce</button>
-        ${consiglio('Scorri l\'estratto conto degli ultimi 12 mesi e cerca le uscite grandi che non tornano ogni mese. Gli importi suggeriti sono solo indicativi: metti i tuoi. Più mesi per la stessa voce (es. TARI in due rate) si aggiungono dopo, nella scheda Voci.')}`,
+        ${consiglio('Scorri l\'estratto conto degli ultimi 12 mesi e cerca le uscite grandi che non tornano ogni mese. Gli importi suggeriti sono solo indicativi: metti i tuoi. Più mesi per la stessa voce (es. TARI in due rate) si aggiungono dopo, in Impostazioni → Voci.')}`,
     },
     {
       titolo: 'Spese o entrate una tantum',
@@ -287,7 +287,7 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
             <p class="nota">Confronta i soldi di oggi con quelli previsti per la fine del mese: se lo stipendio o alcune spese devono ancora arrivare, a metà mese può essere negativa senza che ci sia un problema.</p>` : ''}
         </section>
         ${avvisi.map((a) => `<p class="avvertenza">${esc(a)}</p>`).join('')}
-        ${consiglio('Dopo la creazione: aggiorna i "Dati correnti" in Home ogni settimana, esporta un backup dalle Opzioni e usa i pulsanti ⓘ per le spiegazioni di ogni scheda. Le frasi motivazionali sono già pronte e si modificano in Opzioni.')}`;
+        ${consiglio('Dopo la creazione: aggiorna i "Dati correnti" in Home ogni settimana, esporta un backup dalle Impostazioni e usa i pulsanti ⓘ per le spiegazioni di ogni scheda. Le frasi motivazionali sono già pronte e si modificano in Impostazioni.')}`;
       },
       avanti: 'Crea il mio Portafoglio',
     },
@@ -401,8 +401,8 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
         conferma({
           titolo: 'Uscire dalla compilazione guidata?',
           testo: precompilata
-            ? 'Le modifiche fatte qui non verranno salvate: i tuoi dati restano come sono. Potrai ricominciare dalle Opzioni.'
-            : 'Le risposte date finora non verranno salvate. Potrai ricominciare dalle Opzioni.',
+            ? 'Le modifiche fatte qui non verranno salvate: i tuoi dati restano come sono. Potrai ricominciare dalle Impostazioni.'
+            : 'Le risposte date finora non verranno salvate. Potrai ricominciare dalle Impostazioni.',
           ok: 'Esci', pericolo: true,
           onOk: () => { chiudi(); onEsci(); },
         });

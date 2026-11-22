@@ -8,7 +8,7 @@ Voci periodiche e straordinarie, Salvadanai con obiettivi, frasi motivazionali, 
 
 - **Compilazione guidata**: al primo avvio (e dopo "Cancella tutti i dati") l'app fa le domande passo
   passo per riempire Home, Voci e Salvadanai, con esempi e suggerimenti. Si può rifare da
-  Opzioni → Compilazione guidata: se ci sono già dati, le risposte sono **precompilate** con quelli
+  Impostazioni → Compilazione guidata: se ci sono già dati, le risposte sono **precompilate** con quelli
   (voci, salvadanai, frasi e valori inseriti mese per mese restano). Non ci sono più dati di esempio.
 - **Richiesta di backup a ogni avvio**, con la spiegazione dei rischi di perdere i dati.
 - **Esportazione in Excel** (.xlsx) con 5 fogli: Home, Proiezione, Voci, Salvadanai, Impostazioni.
@@ -40,7 +40,7 @@ Usa un repository **nuovo e separato** da quello dell'app Android (che resta pri
 - **Android**: apri l'indirizzo con **Chrome** → menu **⋮** → **Installa app** (o "Aggiungi a schermata Home").
 
 Per portare i tuoi dati dall'app Android: nell'app Android **Opzioni → Esporta backup**, poi nella web app
-**Opzioni → Importa backup** e scegli il file.
+**Impostazioni → Importa backup** e scegli il file.
 
 ## Aggiornamenti
 

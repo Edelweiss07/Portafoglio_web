@@ -11,7 +11,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.2.1';
+export const VERSIONE_APP = '1.2.2';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -74,9 +74,10 @@ const anniProiezione = () => {
 const PAGINE = {
   home: { titolo: 'Portafoglio', nav: 'Home', icona: ICONE.home, info: 'home', disegna: paginaHome },
   proiezione: { titolo: 'Proiezione', nav: 'Proiezione', icona: ICONE.calendario, info: 'proiezione', disegna: paginaProiezione },
-  voci: { titolo: 'Voci', nav: 'Voci', icona: ICONE.lista, info: 'voci', disegna: paginaVoci },
   salvadanai: { titolo: 'Salvadanai', nav: 'Salvadanai', icona: ICONE.salvadanaio, info: 'salvadanai', disegna: paginaSalvadanai },
-  opzioni: { titolo: 'Opzioni', nav: 'Opzioni', icona: ICONE.opzioni, info: 'opzioni', disegna: paginaOpzioni },
+  impostazioni: { titolo: 'Impostazioni', nav: 'Impostazioni', icona: ICONE.impostazioni, info: 'impostazioni', disegna: paginaImpostazioni },
+  // sotto-pagina di Impostazioni: non è nella barra in basso e ha il pulsante Indietro
+  voci: { titolo: 'Voci', genitore: 'impostazioni', info: 'voci', disegna: paginaVoci },
 };
 
 const vista = document.getElementById('vista');
@@ -90,7 +91,14 @@ function render() {
   const p = PAGINE[ui.pagina];
   document.getElementById('titolo').textContent = p.titolo;
   document.getElementById('info-pagina').dataset.info = p.info;
-  document.querySelectorAll('.navbar button').forEach((b) => b.classList.toggle('attiva', b.dataset.pagina === ui.pagina));
+  const inNavbar = p.genitore || ui.pagina;
+  document.querySelectorAll('.navbar button').forEach((b) => b.classList.toggle('attiva', b.dataset.pagina === inNavbar));
+  const indietro = document.getElementById('indietro');
+  indietro.hidden = !p.genitore;
+  if (p.genitore) {
+    indietro.dataset.pagina = p.genitore;
+    indietro.setAttribute('aria-label', `Indietro: ${PAGINE[p.genitore].titolo}`);
+  }
   vista.className = '';
   vista.innerHTML = p.disegna();
   dopoRender[ui.pagina]?.();
@@ -113,7 +121,7 @@ function vaiA(pagina) {
 
 function pagerAnni(id, contenuto, sopra = '') {
   const anni = anniProiezione();
-  if (!anni.length) return '<p class="vuoto">Nessun anno nella proiezione: controlla le Opzioni.</p>';
+  if (!anni.length) return '<p class="vuoto">Nessun anno nella proiezione: controlla le Impostazioni.</p>';
   if (!anni.includes(ui.anno[id])) ui.anno[id] = anni.includes(oggi().y) ? oggi().y : anni[0];
   vista.classList.add('con-pager');
   return `${sopra}<div class="schede-anni" role="tablist">${anni.map((a) =>
@@ -181,7 +189,7 @@ function homeTarget() {
   const frase = M.frasePer(r.disponibilita, stato.impostazioni.frasi);
   return `${rigaValore('Target saldo', r.target)}${rigaValore('Saldo disponibile', r.saldoDisponibile)}<hr>
     ${rigaValore('Disponibilità', r.disponibilita, { grande: true })}
-    ${r.target == null ? '<p class="errore piccolo">Il mese corrente è fuori dal periodo della proiezione: controlla le Opzioni.</p>'
+    ${r.target == null ? '<p class="errore piccolo">Il mese corrente è fuori dal periodo della proiezione: controlla le Impostazioni.</p>'
     : frase ? `<p class="frase">${esc(frase)}</p>` : ''}`;
 }
 
@@ -575,7 +583,7 @@ function dialogoValoreSalvadanaio(id, k) {
   el.querySelector('input').focus();
 }
 
-// ---------- OPZIONI ----------
+// ---------- IMPOSTAZIONI ----------
 
 function ultimoBackupTxt() {
   const t = localStorage.getItem(CHIAVE_BACKUP);
@@ -585,9 +593,13 @@ function ultimoBackupTxt() {
   return `Ultimo backup esportato: ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}${giorni > 0 ? ` (${giorni} ${giorni === 1 ? 'giorno' : 'giorni'} fa)` : ' (oggi)'}.`;
 }
 
-function paginaOpzioni() {
+function paginaImpostazioni() {
   const i = stato.impostazioni;
+  const nPer = stato.voci.filter((v) => v.tipo === 'PERIODICO').length;
+  const nExtra = stato.voci.filter((v) => v.tipo === 'EXTRA').length;
   return `<div class="contenuto">
+    ${sezione('Voci', `<p class="nota">Spese ed entrate che non arrivano ogni mese: ${nPer} ${nPer === 1 ? 'periodica' : 'periodiche'}, ${nExtra} ${nExtra === 1 ? 'straordinaria' : 'straordinarie'}.</p>
+      <button type="button" class="btn btn-contorno pieno" data-pagina="voci">${ICONE.lista}Gestisci le voci</button>`, { info: 'voci' })}
     ${sezione('Periodo della proiezione', `<div class="due-colonne">${campo('Mese inizio', i.inizioMese, 'data-imp="inizioMese"')}${campo('Anno inizio', i.inizioAnno, 'data-imp="inizioAnno"')}</div>
       ${campo('Ultimo anno', i.fineAnno, 'data-imp="fineAnno"')}`, { info: 'periodo' })}
     ${sezione("Valori di partenza (fine del mese prima dell'inizio)", `${campo('Saldo contabile iniziale', i.saldoIniziale, 'data-imp="saldoIniziale"')}
@@ -606,7 +618,7 @@ function paginaOpzioni() {
   </div>`;
 }
 
-function collegaOpzioni() {
+function collegaImpostazioni() {
   vista.querySelectorAll('[data-imp]').forEach((inp) => inp.addEventListener('change', () => {
     const k = inp.dataset.imp;
     const v = inp.value.trim() === '' ? 0 : parseNumero(inp.value);
@@ -636,7 +648,7 @@ const dopoRender = {
   proiezione: () => collegaPager('proiezione'),
   voci: collegaVoci,
   salvadanai: () => collegaPager('salvadanai'),
-  opzioni: collegaOpzioni,
+  impostazioni: collegaImpostazioni,
 };
 
 // ---------- Backup ed esportazione ----------
@@ -650,7 +662,7 @@ async function esportaBackup() {
   if (dove) {
     localStorage.setItem(CHIAVE_BACKUP, new Date().toISOString());
     avviso(msgSalvato('Backup', dove));
-    if (ui.pagina === 'opzioni') render();
+    if (ui.pagina === 'impostazioni') render();
   }
   return !!dove;
 }
@@ -787,7 +799,7 @@ document.addEventListener('visibilitychange', () => {
 // ---------- Avvio ----------
 
 function costruisciNavbar() {
-  document.querySelector('.navbar').innerHTML = Object.entries(PAGINE).map(([k, p]) =>
+  document.querySelector('.navbar').innerHTML = Object.entries(PAGINE).filter(([, p]) => p.nav).map(([k, p]) =>
     `<button type="button" data-pagina="${k}">${p.icona}<span>${p.nav}</span></button>`).join('');
 }
 
