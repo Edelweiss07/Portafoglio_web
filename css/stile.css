@@ -65,6 +65,8 @@ p { margin: 6px 0; }
 }
 .testata h1 { font-size: 1.15rem; font-weight: 600; }
 .testata .info-btn { position: absolute; right: 8px; bottom: 4px; }
+.testata .indietro-btn { position: absolute; left: 8px; bottom: 4px; color: var(--testo); }
+.testata .indietro-btn[hidden] { display: none; }
 
 #vista {
   flex: 1; overflow-y: auto; position: relative;

@@ -41,7 +41,7 @@ ${GRASSETTO}`],
 • Disponibilità = Saldo disponibile − Target saldo.
 
 Disponibilità positiva: hai più soldi di quanto previsto. Negativa: sei sotto il piano.
-La frase sotto cambia in base alla Disponibilità; le frasi e le soglie si impostano in Opzioni.
+La frase sotto cambia in base alla Disponibilità; le frasi e le soglie si impostano in Impostazioni.
 
 A inizio mese la Disponibilità del mese finito viene sommata all'Extra di quel mese: così la proiezione riparte dai soldi che hai davvero.
 
@@ -55,7 +55,7 @@ ${GRASSETTO}`],
 • Welfare: credito welfare aziendale ancora disponibile.
 • Residuo carte: quanto puoi ancora spendere sulle carte di credito questo mese.
 
-Il plafond delle carte si imposta in Opzioni; il valore del buono pasto con il pulsante "Parametri del mese".`],
+Il plafond delle carte si imposta in Impostazioni; il valore del buono pasto con il pulsante "Parametri del mese".`],
 
   calcoli: ['Calcoli', `• Saldo buoni = Buoni residui × Valore buono pasto del mese (modificabile con "Parametri del mese").
 • Saldo netto = Saldo corrente − Non addebitato + Non accreditato + Saldo buoni + Welfare.
@@ -137,7 +137,7 @@ ${SMART}
 
 ${FRASI_SMART}`],
 
-  opzioni: ['Opzioni', `Impostazioni generali dell'app: periodo della proiezione, valori di partenza, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel e reset.
+  impostazioni: ['Impostazioni', `Impostazioni generali dell'app: voci periodiche e straordinarie (pulsante "Gestisci le voci"), periodo della proiezione, valori di partenza, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel e reset.
 In fondo trovi il numero di versione.`],
 
   periodo: ['Periodo della proiezione', `• Mese e anno di inizio: il primo mese calcolato.
