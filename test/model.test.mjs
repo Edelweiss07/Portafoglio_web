@@ -365,3 +365,34 @@ test('riordino delle voci', () => {
   assert.deepEqual(M.riordinaVoci(s, ['c', 'a']).voci.map((v) => v.id), ['c', 'b', 'a']);
   assert.equal(M.riordinaVoci(s, ['c', 'zz']), s);
 });
+
+test('estinzione attivata: residuo pagato e rate risparmiate', () => {
+  const s = M.vuoto({ y: 2026, m: 1 });
+  s.mesi['2026-01'] = { extra: 0, entrate: 1000, spese: 500 };
+  s.finanziamenti = [
+    { id: 'grande', nome: 'Auto', residuo: 3000, rata: 200 },
+    { id: 'piccolo', nome: 'Telefono', residuo: 600, rata: 50 },
+  ];
+  const base = M.proiezione(s);
+  const e = M.estinzioni(s, base, { y: 2026, m: 1 });
+  const n = M.impostaEstinzione(s, 'piccolo', e[0].chiave);
+  const r = M.proiezione(n);
+  // febbraio: 1000 − 500 (residuo pagato); marzo: +500 di utile +50 di rata risparmiata
+  assert.deepEqual(r.slice(0, 4).map((x) => x.saldoContabile), [500, 500, 1050, 1600]);
+  assert.deepEqual(r.slice(0, 3).map((x) => x.finanziamenti.piccolo.residuo), [550, 0, 0]);
+  vicino(r[1].estinzione, 500);
+  vicino(r[2].rateRisparmiate, 50);
+  assert.deepEqual(r.slice(0, 3).map((x) => x.rata), [250, 250, 200]);
+  // ogni mese il saldo è quello di prima meno il residuo che non c'è più
+  r.forEach((x, i) => { if (i >= 1) vicino(x.saldoContabile, base[i].saldoContabile - base[i].finanziamenti.piccolo.residuo); });
+  assert.ok(r.every((x) => x.saldoContabile >= 0));
+  // i punti restano quelli calcolati senza estinzioni
+  assert.deepEqual(M.estinzioni(n, r, { y: 2026, m: 1 }).map((x) => x.chiave), e.map((x) => x.chiave));
+  // entrambe attive: mai in negativo
+  const tutte = M.impostaEstinzione(n, 'grande', e[1].chiave);
+  assert.ok(M.proiezione(tutte).every((x) => x.saldoContabile >= 0));
+  assert.equal(M.proiezione(tutte).at(-1).residuoFinanziamenti, 0);
+  // backup e disattivazione
+  assert.deepEqual(M.normalizza(JSON.parse(JSON.stringify(M.perBackup(tutte)))).finanziamenti, tutte.finanziamenti);
+  assert.deepEqual(M.impostaEstinzione(n, 'piccolo', null), s);
+});
