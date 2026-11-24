@@ -83,7 +83,7 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
     .map((m) => ({ ...m, scelta: false, saldo: 0, obiettivo: 0, scadenzaMese: 12, scadenzaAnno: oggi.y + 1 }));
   const w = {
     inizio: { ...oggi }, anni: 3,
-    saldoIniziale: 0, residuo: 0, rata: 0,
+    saldoIniziale: 0, finanziamenti: [],
     entrate: 0, spese: 0, valoreBuono: 0,
     corrente: { saldo: 0, nonAddebitato: 0, nonAccreditato: 0, buoniResidui: 0, welfare: 0, residuoCarte: 0 }, plafond: 0,
     straordinarie: [],
@@ -138,8 +138,13 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
         ${esempio('Se il 1° del mese l\'app della banca segnava 2.850 €, scrivi 2850.')}
         ${consiglio('Se non lo ricordi, usa il saldo di oggi: il primo mese sarà un po\' meno preciso, poi alla chiusura del mese l\'app si riallinea da sola. Se hai più conti, somma quelli che usi per le spese di tutti i giorni.')}
         <h4>Prestiti e finanziamenti</h4>
-        <p>Hai un prestito o un acquisto a rate? Indica quanto ti resta da pagare in totale e la rata mensile. Se non ne hai, lascia vuoto.</p>
-        <div class="due-colonne">${campo('Debito residuo (€)', w.residuo, 'data-w="residuo"')}${campo('Rata mensile (€)', w.rata, 'data-w="rata"')}</div>
+        <p>Hai prestiti o acquisti a rate? Per ognuno indica quanto ti resta da pagare e la rata mensile. Se non ne hai, vai avanti.</p>
+        ${w.finanziamenti.map((f, i) => `<section class="scheda voce-guidata">
+          <div class="mese-testa"><h3>Finanziamento ${i + 1}</h3><button type="button" class="icona-btn" data-g-elimina="finanziamenti.${i}" aria-label="Elimina">${ICONE.cestino}</button></div>
+          ${campoTesto('Nome', f.nome, `data-wt="finanziamenti.${i}.nome"`)}
+          <div class="due-colonne">${campo('Debito residuo (€)', f.residuo, `data-w="finanziamenti.${i}.residuo"`)}${campo('Rata mensile (€)', f.rata, `data-w="finanziamenti.${i}.rata"`)}</div>
+        </section>`).join('')}
+        <button type="button" class="btn btn-contorno pieno" data-g="nuovo-finanziamento">${ICONE.piu}Aggiungi un finanziamento</button>
         ${esempio('Finanziamento auto: restano 6.400 € da pagare, rata di 220 € al mese.')}
         ${consiglio('Il mutuo della casa di solito si inserisce come spesa fissa mensile (prossimo passo) e non qui: altrimenti il "Saldo netto totale" risulterebbe molto negativo per decenni.')}`,
     },
@@ -418,6 +423,10 @@ export function avviaGuidata({ oggi, iniziale = null, onFine, onImporta, onEsci 
         break;
       case 'nuova-straordinaria':
         w.straordinarie.push({ nome: '', importo: 0, entrata: false, mese: oggi.m, anno: w.inizio.y });
+        disegna(false);
+        break;
+      case 'nuovo-finanziamento':
+        w.finanziamenti.push({ nome: '', residuo: 0, rata: 0 });
         disegna(false);
         break;
       case 'nuovo-salvadanaio':

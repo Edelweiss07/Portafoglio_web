@@ -17,7 +17,8 @@ Voci periodiche e straordinarie, Salvadanai con obiettivi, frasi motivazionali, 
   Se il browser non permette nessuna delle due, il file va nella cartella Download.
 
 I dati restano **solo sul dispositivo** (memoria del browser). Il formato di backup è lo stesso dell'app
-Android: un backup esportato da una delle due si importa nell'altra.
+Android: un backup esportato da una delle due si importa nell'altra. I finanziamenti multipli sono
+salvati come elenco; nel file ci sono anche residuo e rata totali, così l'app Android calcola lo stesso residuo.
 
 ## Pubblicarla con GitHub Pages (account gratuito)
 
@@ -59,7 +60,12 @@ un backup. Salva il file in un posto sicuro (File, iCloud Drive, Google Drive, e
 - Utile = Entrate nette − Spese fisse
 - Periodico = somma delle voci periodiche attive nel mese
 - Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico
-- Residuo finanziamenti = Residuo del mese prima − Rata
+- Residuo di ogni finanziamento = Residuo del mese prima − sua Rata; Residuo finanziamenti = somma dei residui
+  (le rate sono già comprese nelle Spese fisse e non toccano il Saldo contabile)
+- Estinzione: per ogni finanziamento, dal residuo più basso al più alto, il primo mese da cui pagando il
+  residuo il Saldo contabile (tolti i finanziamenti già estinti) resta ≥ 0 fino alla fine della proiezione
+- Frasi: soglia negativa superata se il valore è minore; soglia positiva o zero se il valore è uguale o maggiore;
+  vale la soglia superata più lontana da zero
 - Saldo al netto dei salvadanai = Saldo contabile − somma dei salvadanai
 - Saldo al netto dei finanziamenti = Saldo contabile − Residuo finanziamenti
 - Saldo netto totale = Saldo contabile − somma dei salvadanai − Residuo finanziamenti

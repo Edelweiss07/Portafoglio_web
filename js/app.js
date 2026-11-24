@@ -11,7 +11,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.2.2';
+export const VERSIONE_APP = '1.3.0';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -40,6 +40,8 @@ const ui = {
   anno: { proiezione: null, voci: null, salvadanai: null },
   tipoVoci: 'PERIODICO',
   chiusura: null,
+  // mesi aperti nella Proiezione: all'apertura della scheda sono tutti chiusi
+  mesiAperti: new Set(),
 };
 
 function salva() {
@@ -112,6 +114,7 @@ function render() {
 function vaiA(pagina) {
   if (ui.pagina === pagina) return;
   ui.pagina = pagina;
+  if (pagina === 'proiezione') ui.mesiAperti = new Set();
   vista.scrollTop = 0;
   vista.innerHTML = '';
   render();
@@ -244,16 +247,33 @@ function collegaHome() {
 // ---------- PROIEZIONE ----------
 
 const piccola = (etichetta, v, calcolato = false) => riga(etichetta, v, calcolato);
+const finanziamenti = () => stato.finanziamenti || [];
 
-function cardMese(r) {
+function righeFinanziamenti(r) {
+  const fin = finanziamenti();
+  if (fin.length <= 1) {
+    return `${piccola('Rata finanziamenti', r.rata)}${piccola('Residuo finanziamenti', r.residuoFinanziamenti, true)}`;
+  }
+  return `${fin.map((f) => `${piccola(`Rata ${f.nome}`, r.finanziamenti[f.id]?.rata ?? 0)}${piccola(`Residuo ${f.nome}`, r.finanziamenti[f.id]?.residuo ?? 0, true)}`).join('')}
+    ${piccola('Residuo finanziamenti (totale)', r.residuoFinanziamenti, true)}`;
+}
+
+function cardMese(r, est) {
   const attuale = M.stessoMese(r.ym, oggi());
+  const aperto = ui.mesiAperti.has(r.chiave);
   const salv = stato.salvadanai.map((sv) => {
     const v = r.salvadanai[sv.id] ?? 0;
     return v ? piccola(`Salvadanaio ${sv.nome}`, v) : '';
   }).join('');
-  return `<section class="scheda mese${attuale ? ' attuale' : ''}">
-    <div class="mese-testa"><h3>${meseTxt(r.ym)}${attuale ? ' <small>• corrente</small>' : ''}</h3>
-      <strong class="${classeImporto(r.saldoContabile)}">${euro(r.saldoContabile)}</strong></div>
+  const qui = est.filter((e) => e.chiave === r.chiave);
+  return `<section class="scheda mese${attuale ? ' attuale' : ''}${aperto ? ' aperta' : ''}">
+    <button type="button" class="mese-testa" data-espandi-mese="${r.chiave}" aria-expanded="${aperto}">
+      <span class="mese-nome">${meseTxt(r.ym)}${attuale ? '<small>mese corrente</small>' : ''}</span>
+      <span class="mese-saldo"><small>Saldo contabile previsto</small><strong class="${classeImporto(r.saldoContabile)}">${euro(r.saldoContabile)}</strong></span>
+      <span class="freccia">${ICONE.giu}</span>
+    </button>
+    ${qui.map((e) => `<p class="badge-estinzione">${est.indexOf(e) + 1} · Puoi estinguere ${esc(e.nome)} con ${euro(e.importo)}</p>`).join('')}
+    <div class="mese-dettagli"${aperto ? '' : ' hidden'}>
     ${piccola('Entrate nette', r.entrate)}${piccola('Spese fisse', -r.spese)}
     ${piccola('Utile (entrate − spese)', r.utile, true)}
     ${r.extraManuale ? piccola('Extra (manuale)', r.extraManuale) : ''}
@@ -261,16 +281,31 @@ function cardMese(r) {
     ${r.periodico ? piccola('Periodico', r.periodico, true) : ''}
     ${piccola('Valore buono pasto', r.valoreBuono)}<hr>
     ${salv}${stato.salvadanai.length ? piccola('Totale salvadanai', r.totaleSalvadanai, true) : ''}
-    ${piccola('Rata finanziamenti', r.rata)}${piccola('Residuo finanziamenti', r.residuoFinanziamenti, true)}<hr>
+    ${righeFinanziamenti(r)}<hr>
     ${piccola('Saldo contabile', r.saldoContabile, true)}
     ${piccola('Saldo al netto dei salvadanai', r.saldoAlNettoSalvadanai, true)}
     ${piccola('Saldo al netto dei finanziamenti', r.saldoNettoFinanziamenti, true)}
     ${rigaValore('Saldo netto totale', r.saldoNettoTotale, { grande: true })}
     <button type="button" class="btn btn-contorno pieno" data-azione="parametri" data-mese="${r.chiave}">${ICONE.matita}Parametri del mese</button>
+    </div>
   </section>`;
 }
 
+/** Elenco sotto il grafico Andamento: quando si può estinguere ogni finanziamento. */
+function elencoEstinzioni(est) {
+  if (!est.length) return '';
+  const mese = (ym) => `${NOMI_MESI_LUNGHI[ym.m - 1].toLowerCase()} ${ym.y}`;
+  return `<div class="estinzioni"><p class="etichetta">Estinzione dei finanziamenti (dal residuo più basso)</p>
+    ${est.map((e, i) => (e.indice != null
+    ? `<p><span class="marcatore fermo">${i + 1}</span><span><strong>${esc(e.nome)}</strong>: da ${mese(e.ym)} con ${euro(e.importo)}</span></p>`
+    : `<p><span class="marcatore fermo spento-m">–</span><span><strong>${esc(e.nome)}</strong>: non si può estinguere prima senza andare in negativo${e.fineNaturale != null ? `; finisce da solo a ${mese(righe[e.fineNaturale].ym)}` : ''}</span></p>`)).join('')}
+    <p class="nota">Il primo mese da cui, pagando il residuo, il Saldo contabile non va mai sotto zero fino alla fine della proiezione (contando le rate risparmiate dopo).</p></div>`;
+}
+
 function paginaProiezione() {
+  const est = M.estinzioni(stato, righe, oggi());
+  const marcatori = est.filter((e) => e.indice != null)
+    .map((e) => ({ indice: e.indice, etichetta: String(est.indexOf(e) + 1), titolo: `${e.nome}: ${meseTxt(e.ym)}` }));
   return pagerAnni('proiezione', (anno) => {
     const delAnno = righe.filter((r) => r.ym.y === anno);
     const i0 = righe.findIndex((r) => r.ym.y === anno);
@@ -280,8 +315,7 @@ function paginaProiezione() {
     return `<div class="contenuto">
       ${graficoLinee('Andamento', [
         { nome: 'Saldo contabile', colore: COLORI.contabile, valori: righe.map((r) => r.saldoContabile) },
-        { nome: 'Saldo netto totale', colore: COLORI.netto, valori: righe.map((r) => r.saldoNettoTotale) },
-      ], [i0, i1], `Tutto il periodo, ${anno} evidenziato`)}
+      ], [i0, i1], `Tutto il periodo, ${anno} evidenziato`, marcatori, elencoEstinzioni(est))}
       ${graficoBarre('Extra di fine mese', NOMI_MESI.map((m) => m[0]), [
         { nome: 'Disponibilità riportate / extra manuali', colore: COLORI.delta, valori: mesi.map((r) => r?.extraManuale ?? 0) },
         { nome: 'Voci straordinarie', colore: COLORI.straordinarie, valori: mesi.map((r) => r?.extraVoci ?? 0) },
@@ -290,7 +324,7 @@ function paginaProiezione() {
         ${rigaValore('Saldo al netto dei salvadanai', ultimo.saldoAlNettoSalvadanai)}
         ${rigaValore('Saldo al netto dei finanziamenti', ultimo.saldoNettoFinanziamenti)}
         ${rigaValore('Saldo netto totale', ultimo.saldoNettoTotale, { grande: true })}`, { info: 'proiezione' }) : ''}
-      ${delAnno.map(cardMese).join('')}
+      ${delAnno.map((r) => cardMese(r, est)).join('')}
     </div>`;
   });
 }
@@ -311,27 +345,30 @@ function dialogoMese(k) {
       <div id="utile-live">${rigaValore('Utile = Entrate nette − Spese fisse', r.utile, { grande: true })}</div>
       ${campo('Valore buono pasto', r.valoreBuono, 'data-m="valoreBuono"')}
       ${campo('Extra (manuale)', input.extra || 0, 'data-m="extra"', r.extraVoci ? `Più ${euro(r.extraVoci)} da voci straordinarie` : 'Solo per questo mese')}
-      ${campo('Rata finanziamenti', r.rata, 'data-m="rata"', 'Vale anche per i mesi seguenti')}
+      ${finanziamenti().length ? `<h4>Rate dei finanziamenti</h4>${finanziamenti().map((f) => campo(`Rata ${f.nome}`,
+        r.finanziamenti[f.id]?.rataImpostata ?? 0, `data-rata="${esc(f.id)}"`,
+        `Vale anche per i mesi seguenti · residuo a fine mese ${euro(r.finanziamenti[f.id]?.residuo ?? 0)}`)).join('')}`
+    : '<p class="nota">Nessun finanziamento: si aggiungono in Impostazioni → Finanziamenti.</p>'}
       <p class="nota">I salvadanai si modificano nella scheda Salvadanai.</p>`,
     azioni: [
       { testo: 'Annulla' },
       { testo: 'Salva', tipo: 'primario', onClick: () => salvaDialogo() },
     ],
   });
-  const leggi = (c) => {
-    const t = el.querySelector(`[data-m="${c}"]`).value;
-    return t.trim() === '' ? 0 : parseNumero(t);
-  };
+  const valore = (inp) => (inp.value.trim() === '' ? 0 : parseNumero(inp.value));
+  const leggi = (c) => valore(el.querySelector(`[data-m="${c}"]`));
   el.addEventListener('input', () => {
     const e = leggi('entrate'); const s = leggi('spese');
     if (e != null && s != null) el.querySelector('#utile-live').innerHTML = rigaValore('Utile = Entrate nette − Spese fisse', e - s, { grande: true });
   });
   function salvaDialogo() {
-    const v = Object.fromEntries(['entrate', 'spese', 'valoreBuono', 'extra', 'rata'].map((c) => [c, leggi(c)]));
-    if (Object.values(v).some((x) => x == null)) { avviso('Controlla i numeri inseriti.'); return; }
+    const v = Object.fromEntries(['entrate', 'spese', 'valoreBuono', 'extra'].map((c) => [c, leggi(c)]));
+    const rate = Object.fromEntries([...el.querySelectorAll('[data-rata]')].map((inp) => [inp.dataset.rata, valore(inp)]));
+    if ([...Object.values(v), ...Object.values(rate)].some((x) => x == null)) { avviso('Controlla i numeri inseriti.'); return; }
+    for (const id of Object.keys(rate)) rate[id] = Math.abs(rate[id]);
     const cambi = {};
     for (const c of ['entrate', 'spese', 'valoreBuono']) if (v[c] !== r[c]) cambi[c] = v[c];
-    const applica = (modo) => { aggiorna(M.salvaMese(stato, ym, v.extra, v.rata, cambi, modo)); chiudi(); };
+    const applica = (modo) => { aggiorna(M.salvaMese(stato, ym, v.extra, rate, cambi, modo)); chiudi(); };
     if (!Object.keys(cambi).length || ultimoMese) { applica('FINO_PROSSIMA'); return; }
     const nomi = { entrate: 'Entrate nette', spese: 'Spese fisse', valoreBuono: 'Valore buono pasto' };
     const scelta = (modo, titolo, testo) => `<button type="button" class="scelta" data-modo="${modo}"><strong>${titolo}</strong><span>${testo}</span></button>`;
@@ -377,11 +414,13 @@ function paginaVoci() {
         ? `Spese o entrate una tantum del ${anno}: non si ripetono negli altri anni. Tocca un mese per inserirle nella proiezione.`
         : 'Si ripetono negli anni: un mese attivato vale per l\'anno mostrato e per quelli successivi. Le spese di ogni mese (bollette, spesa…) vanno nelle Spese fisse, dai Parametri del mese in Proiezione.'}</p>
       ${voci.length ? '' : '<p class="vuoto">Nessuna voce in questo anno.</p>'}
-      ${voci.map((v) => `<section class="scheda voce">
-        <button type="button" class="voce-testa" data-modifica-voce="${esc(v.id)}"><span>${esc(v.nome || '(senza nome)')}</span>
-          <span class="${classeImporto(v.importo)}">${euro(v.importo)}</span></button>
+      ${voci.length > 1 ? '<p class="nota">Tieni premuta la maniglia ≡ e trascina per cambiare l\'ordine.</p>' : ''}
+      <div class="lista-voci">${voci.map((v) => `<section class="scheda voce" data-id-voce="${esc(v.id)}">
+        <div class="voce-riga"><span class="maniglia" role="button" aria-label="Trascina per riordinare ${esc(v.nome)}">${ICONE.trascina}</span>
+          <button type="button" class="voce-testa" data-modifica-voce="${esc(v.id)}"><span>${esc(v.nome || '(senza nome)')}</span>
+          <span class="${classeImporto(v.importo)}">${euro(v.importo)}</span></button></div>
         <div data-voce="${esc(v.id)}" data-anno-voce="${anno}">${grigliaMesi(v, anno, 'data-toggle')}</div>
-      </section>`).join('')}
+      </section>`).join('')}</div>
     </div>`;
   }, sopra) + `<button type="button" class="fab" data-azione="nuova-voce">${ICONE.piu}Nuova voce</button>`;
 }
@@ -392,13 +431,87 @@ function collegaVoci() {
     ui.tipoVoci = b.dataset.tipoVoci;
     render();
   }));
+  vista.querySelectorAll('.maniglia').forEach((m) => m.addEventListener('pointerdown', iniziaTrascinamento));
+}
+
+/**
+ * Trascinamento di una voce tenendo premuta la maniglia (mouse, dito o penna).
+ * Le altre voci si spostano per fare posto; al rilascio si salva il nuovo ordine.
+ */
+function iniziaTrascinamento(ev) {
+  if (ev.button != null && ev.button !== 0) return;
+  ev.preventDefault();
+  const maniglia = ev.currentTarget;
+  const card = maniglia.closest('.voce');
+  const lista = card.parentElement;
+  const scorre = card.closest('.pagina-anno') || vista;
+  const carte = [...lista.children];
+  const da = carte.indexOf(card);
+  if (carte.length < 2) return;
+  const gap = parseFloat(getComputedStyle(lista).rowGap) || 0;
+  const passo = card.getBoundingClientRect().height + gap;
+  const centri = carte.map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
+  const y0 = ev.clientY;
+  const scroll0 = scorre.scrollTop;
+  let yAttuale = ev.clientY;
+  let a = da;
+  let auto = null;
+  maniglia.setPointerCapture?.(ev.pointerId);
+  card.classList.add('trascinata');
+  lista.classList.add('in-riordino');
+
+  const sposta = () => {
+    const dy = yAttuale - y0 + (scorre.scrollTop - scroll0);
+    card.style.transform = `translateY(${dy}px)`;
+    const centro = centri[da] + dy;
+    a = da;
+    while (a < carte.length - 1 && centro > centri[a + 1]) a++;
+    while (a > 0 && centro < centri[a - 1]) a--;
+    carte.forEach((c, i) => {
+      if (c === card) return;
+      let t = 0;
+      if (da < a && i > da && i <= a) t = -passo;
+      if (da > a && i < da && i >= a) t = passo;
+      c.style.transform = t ? `translateY(${t}px)` : '';
+    });
+  };
+  // scorrimento automatico vicino ai bordi
+  const ciclo = () => {
+    const r = scorre.getBoundingClientRect();
+    const bordo = 56;
+    let v = 0;
+    if (yAttuale < r.top + bordo) v = -Math.ceil((r.top + bordo - yAttuale) / 6);
+    else if (yAttuale > r.bottom - bordo) v = Math.ceil((yAttuale - (r.bottom - bordo)) / 6);
+    if (v) { scorre.scrollTop += v; sposta(); }
+    auto = requestAnimationFrame(ciclo);
+  };
+  auto = requestAnimationFrame(ciclo);
+  const muovi = (e) => { yAttuale = e.clientY; sposta(); };
+  const fine = () => {
+    cancelAnimationFrame(auto);
+    maniglia.removeEventListener('pointermove', muovi);
+    maniglia.removeEventListener('pointerup', fine);
+    maniglia.removeEventListener('pointercancel', fine);
+    lista.classList.remove('in-riordino');
+    card.classList.remove('trascinata');
+    carte.forEach((c) => { c.style.transform = ''; });
+    if (a === da) return;
+    const ids = carte.map((c) => c.dataset.idVoce);
+    ids.splice(a, 0, ids.splice(da, 1)[0]);
+    aggiorna(M.riordinaVoci(stato, ids));
+  };
+  maniglia.addEventListener('pointermove', muovi);
+  maniglia.addEventListener('pointerup', fine);
+  maniglia.addEventListener('pointercancel', fine);
 }
 
 function dialogoVoce(voce, annoPagina, nuova) {
   const anni = anniProiezione();
   let lavoro = JSON.parse(JSON.stringify(voce));
   let nome = voce.nome;
-  let importo = voce.importo;
+  // l'importo si scrive sempre positivo; Uscita / Entrata ne decide il segno (nuova voce: uscita)
+  let importo = Math.abs(voce.importo);
+  let entrata = voce.importo > 0;
   const annoVisto = () => (lavoro.tipo === 'EXTRA' ? lavoro.anno ?? annoPagina : annoPagina);
   const { el, chiudi } = apriModale({
     titolo: nuova ? 'Nuova voce' : 'Modifica voce',
@@ -409,7 +522,7 @@ function dialogoVoce(voce, annoPagina, nuova) {
       {
         testo: 'Salva', tipo: 'primario', onClick: () => {
           if (!nome.trim()) { avviso('Inserisci un nome.'); return; }
-          aggiorna(M.salvaVoce(stato, { ...lavoro, nome: nome.trim(), importo }));
+          aggiorna(M.salvaVoce(stato, { ...lavoro, nome: nome.trim(), importo: (entrata ? 1 : -1) * importo }));
           chiudi();
         },
       },
@@ -419,7 +532,9 @@ function dialogoVoce(voce, annoPagina, nuova) {
     const anno = annoVisto();
     el.querySelector('#corpo-voce').innerHTML = `
       ${campoTesto('Nome', nome, 'data-v="nome"')}
-      ${campo('Importo', importo, 'data-v="importo"', 'Negativo = uscita, positivo = entrata')}
+      <div class="chips"><button type="button" data-segno="uscita" class="${entrata ? '' : 'on'}" aria-pressed="${!entrata}">Uscita</button>
+        <button type="button" data-segno="entrata" class="${entrata ? 'on' : ''}" aria-pressed="${entrata}">Entrata</button></div>
+      ${campo('Importo (€)', importo, 'data-v="importo"', entrata ? 'Entrata: si aggiunge al saldo' : 'Uscita: si toglie dal saldo')}
       <p class="etichetta">Tipo</p>
       <div class="chips"><button type="button" data-tipo="PERIODICO" class="${lavoro.tipo === 'PERIODICO' ? 'on' : ''}">Periodica</button>
         <button type="button" data-tipo="EXTRA" class="${lavoro.tipo === 'EXTRA' ? 'on' : ''}">Straordinaria</button></div>
@@ -444,14 +559,15 @@ function dialogoVoce(voce, annoPagina, nuova) {
     if (ev.target.dataset.v === 'nome') nome = ev.target.value;
     if (ev.target.dataset.v === 'importo') {
       const n = ev.target.value.trim() === '' ? 0 : parseNumero(ev.target.value);
-      if (n != null) importo = n;
+      if (n != null) importo = Math.abs(n);
     }
   });
   el.addEventListener('click', (ev) => {
     const t = ev.target.closest('button');
     if (!t || !el.querySelector('#corpo-voce').contains(t)) return;
     const anno = annoVisto();
-    if (t.dataset.tipo) lavoro = M.cambiaTipo(lavoro, t.dataset.tipo, anno);
+    if (t.dataset.segno) entrata = t.dataset.segno === 'entrata';
+    else if (t.dataset.tipo) lavoro = M.cambiaTipo(lavoro, t.dataset.tipo, anno);
     else if (t.dataset.annoVoceSposta) lavoro = M.cambiaAnno(lavoro, anno + Number(t.dataset.annoVoceSposta));
     else if (t.dataset.meseVoce) lavoro = M.toggle(lavoro, { y: anno, m: Number(t.dataset.meseVoce) }, !t.classList.contains('on'), stato.impostazioni.fineAnno);
     else if (t.dataset.tuttiMesi) lavoro = M.tuttiIMesi(lavoro, anno, t.dataset.tuttiMesi === 'on', stato.impostazioni.fineAnno);
@@ -602,10 +718,13 @@ function paginaImpostazioni() {
       <button type="button" class="btn btn-contorno pieno" data-pagina="voci">${ICONE.lista}Gestisci le voci</button>`, { info: 'voci' })}
     ${sezione('Periodo della proiezione', `<div class="due-colonne">${campo('Mese inizio', i.inizioMese, 'data-imp="inizioMese"')}${campo('Anno inizio', i.inizioAnno, 'data-imp="inizioAnno"')}</div>
       ${campo('Ultimo anno', i.fineAnno, 'data-imp="fineAnno"')}`, { info: 'periodo' })}
-    ${sezione("Valori di partenza (fine del mese prima dell'inizio)", `${campo('Saldo contabile iniziale', i.saldoIniziale, 'data-imp="saldoIniziale"')}
-      ${campo('Residuo finanziamenti iniziale', i.residuoIniziale, 'data-imp="residuoIniziale"')}`, { info: 'valoriPartenza' })}
+    ${sezione("Valori di partenza (fine del mese prima dell'inizio)", `${campo('Saldo contabile iniziale', i.saldoIniziale, 'data-imp="saldoIniziale"')}`, { info: 'valoriPartenza' })}
+    ${sezione('Finanziamenti', `${finanziamenti().length ? finanziamenti().map((f) => `<button type="button" class="riga-finanziamento" data-modifica-fin="${esc(f.id)}">
+        <span><strong>${esc(f.nome)}</strong><small>Residuo iniziale ${euro(f.residuo)} · rata ${euro(f.rata)} al mese</small></span>${ICONE.matita}</button>`).join('')
+    : '<p class="nota">Nessun finanziamento. Aggiungi prestiti e acquisti a rate per vedere il debito residuo e quando puoi estinguerli.</p>'}
+      <button type="button" class="btn btn-contorno pieno" data-azione="nuovo-finanziamento">${ICONE.piu}Nuovo finanziamento</button>`, { info: 'finanziamenti' })}
     ${sezione('Parametri', campo('Disponibilità carte (plafond)', i.plafondCarte, 'data-imp="plafondCarte"'), { info: 'parametri' })}
-    ${sezione('Frasi motivazionali della Home', `<p class="nota">Ogni frase compare quando la Disponibilità raggiunge la sua soglia e resta fino alla soglia successiva. Sotto la soglia più bassa non compare nessuna frase.</p>
+    ${sezione('Frasi motivazionali della Home', `<p class="nota">Soglia negativa: la frase compare quando la Disponibilità scende sotto la soglia. Soglia positiva (o zero): compare quando la Disponibilità la raggiunge o la supera. Se più soglie sono superate vale quella più lontana da zero.</p>
       <div id="frasi-home">${editorFrasi(i.frasi, 'Disponibilità da (€)')}</div>`, { info: 'frasiHome' })}
     ${sezione('Backup ed esportazione', `<p class="nota">${esc(ultimoBackupTxt())}</p>
       <button type="button" class="btn btn-primario pieno" data-azione="esporta-backup">Esporta backup</button>
@@ -627,7 +746,7 @@ function collegaImpostazioni() {
       (k === 'inizioMese' && Number.isInteger(v) && v >= 1 && v <= 12) ||
       (k === 'inizioAnno' && Number.isInteger(v) && v >= 2000 && v <= 2100 && v <= i.fineAnno) ||
       (k === 'fineAnno' && Number.isInteger(v) && v >= i.inizioAnno && v <= 2100) ||
-      ['saldoIniziale', 'residuoIniziale', 'plafondCarte'].includes(k));
+      ['saldoIniziale', 'plafondCarte'].includes(k));
     if (!ok) {
       avviso('Valore non valido.');
       inp.value = numero(i[k]);
@@ -641,6 +760,42 @@ function collegaImpostazioni() {
     aggiorna({ ...stato, impostazioni: { ...stato.impostazioni, frasi: nuove } }, false);
     if (ridisegna) box.innerHTML = editorFrasi(nuove, 'Disponibilità da (€)');
   }, M.FRASI_PREDEFINITE, 500);
+}
+
+function dialogoFinanziamento(f, nuovo) {
+  const dati = { nome: f.nome, residuo: f.residuo || 0, rata: f.rata || 0 };
+  const { el, chiudi } = apriModale({
+    titolo: nuovo ? 'Nuovo finanziamento' : 'Finanziamento',
+    info: 'finanziamenti',
+    corpo: `${campoTesto('Nome', dati.nome, 'data-f="nome"')}
+      ${campo('Residuo iniziale (€)', dati.residuo, 'data-f="residuo"', "Quanto restava da pagare alla fine del mese prima dell'inizio della proiezione")}
+      ${campo('Rata mensile (€)', dati.rata, 'data-f="rata"', 'Si può cambiare mese per mese da Parametri del mese, in Proiezione')}
+      <p class="nota">La rata non viene tolta dal Saldo contabile: deve essere già compresa nelle Spese fisse. Serve a calcolare il residuo mese per mese.</p>
+      ${nuovo ? '' : '<button type="button" class="btn btn-testo pericolo" data-elimina-fin>Elimina finanziamento</button>'}`,
+    azioni: [
+      { testo: 'Annulla' },
+      {
+        testo: 'Salva', tipo: 'primario', onClick: () => {
+          if (!dati.nome.trim()) { avviso('Inserisci un nome.'); return; }
+          aggiorna(M.salvaFinanziamento(stato, { id: f.id, nome: dati.nome.trim(), residuo: Math.abs(dati.residuo), rata: Math.abs(dati.rata) }));
+          chiudi();
+        },
+      },
+    ],
+  });
+  el.addEventListener('input', (ev) => {
+    const k = ev.target.dataset.f;
+    if (!k) return;
+    if (k === 'nome') dati.nome = ev.target.value;
+    else {
+      const n = ev.target.value.trim() === '' ? 0 : parseNumero(ev.target.value);
+      if (n != null) dati[k] = n;
+    }
+  });
+  el.querySelector('[data-elimina-fin]')?.addEventListener('click', () => conferma({
+    titolo: `Eliminare "${f.nome}"?`, testo: 'Verranno cancellate anche le rate modificate mese per mese.', ok: 'Elimina', pericolo: true,
+    onOk: () => { aggiorna(M.eliminaFinanziamento(stato, f.id)); chiudi(); },
+  }));
 }
 
 const dopoRender = {
@@ -658,7 +813,7 @@ const dataFile = () => new Date().toISOString().slice(0, 10);
 const msgSalvato = (cosa, dove) => (dove === 'condiviso' ? `${cosa} esportato` : `${cosa} salvato ${dove}`);
 
 async function esportaBackup() {
-  const dove = await salvaFile(JSON.stringify(stato, null, 2), `portafoglio-${dataFile()}.json`, 'application/json');
+  const dove = await salvaFile(JSON.stringify(M.perBackup(stato), null, 2), `portafoglio-${dataFile()}.json`, 'application/json');
   if (dove) {
     localStorage.setItem(CHIAVE_BACKUP, new Date().toISOString());
     avviso(msgSalvato('Backup', dove));
@@ -759,6 +914,16 @@ document.addEventListener('click', (ev) => {
   }
   if (t.dataset.modificaSalv) { dialogoSalvadanaio(stato.salvadanai.find((x) => x.id === t.dataset.modificaSalv), false); return; }
   if (t.dataset.valoreSalv) { dialogoValoreSalvadanaio(t.dataset.valoreSalv, t.dataset.mese); return; }
+  if (t.dataset.modificaFin) { dialogoFinanziamento(finanziamenti().find((x) => x.id === t.dataset.modificaFin), false); return; }
+  if (t.dataset.espandiMese) {
+    const k = t.dataset.espandiMese;
+    const aperto = !ui.mesiAperti.has(k);
+    if (aperto) ui.mesiAperti.add(k); else ui.mesiAperti.delete(k);
+    t.setAttribute('aria-expanded', aperto);
+    t.closest('.mese').classList.toggle('aperta', aperto);
+    t.closest('.mese').querySelector('.mese-dettagli').hidden = !aperto;
+    return;
+  }
   switch (t.dataset.azione) {
     case 'parametri': dialogoMese(t.dataset.mese); break;
     case 'nascondi-chiusura': ui.chiusura = null; render(); break;
@@ -771,6 +936,9 @@ document.addEventListener('click', (ev) => {
     }
     case 'nuovo-salvadanaio':
       dialogoSalvadanaio({ id: `s${Date.now().toString(36)}`, nome: '', frasi: M.FRASI_SALVADANAIO_PREDEFINITE }, true);
+      break;
+    case 'nuovo-finanziamento':
+      dialogoFinanziamento({ id: `f${Date.now().toString(36)}`, nome: '', residuo: 0, rata: 0 }, true);
       break;
     case 'esporta-backup': esportaBackup(); break;
     case 'importa-backup': importaBackup(); break;

@@ -43,10 +43,11 @@ export function vuoto(oggi) {
     versione: VERSIONE_DATI,
     impostazioni: {
       inizioAnno: oggi.y, inizioMese: oggi.m, fineAnno: oggi.y + 3,
-      saldoIniziale: 0, residuoIniziale: 0, plafondCarte: 1600, frasi: clona(FRASI_PREDEFINITE),
+      saldoIniziale: 0, plafondCarte: 1600, frasi: clona(FRASI_PREDEFINITE),
     },
     saldoCorrente: { saldo: 0, nonAddebitato: 0, nonAccreditato: 0, buoniResidui: 0, welfare: 0, residuoCarte: 0 },
     voci: [],
+    finanziamenti: [],
     salvadanai: [],
     mesi: {},
     ultimoMeseAperto: chiave(oggi.y, oggi.m),
@@ -57,8 +58,8 @@ export function vuoto(oggi) {
 export function eVuoto(s) {
   if (!s) return true;
   const c = s.saldoCorrente;
-  return !s.voci.length && !s.salvadanai.length && !Object.keys(s.mesi).length &&
-    !s.impostazioni.saldoIniziale && !s.impostazioni.residuoIniziale &&
+  return !s.voci.length && !s.salvadanai.length && !(s.finanziamenti || []).length && !Object.keys(s.mesi).length &&
+    !s.impostazioni.saldoIniziale &&
     Object.values(c).every((v) => !v);
 }
 
@@ -67,6 +68,7 @@ export function eVuoto(s) {
  * Gli importi delle voci sono positivi; "entrata" ne decide il segno.
  * Campi facoltativi (presenti quando la compilazione parte da dati esistenti, vedi aCompilazione):
  *  - voci e salvadanai: id (conservato), altriMesi (altri mesi oltre a "mese"), frasi, senzaScadenza;
+ *  - finanziamenti: [{ id?, nome, residuo, rata }]; senza elenco valgono residuo e rata (uno solo);
  *  - frasi: frasi della Home;
  *  - mesiPrecedenti: valori inseriti mese per mese, conservati per i mesi successivi all'inizio.
  */
@@ -77,7 +79,7 @@ export function daCompilazione(r, oggi) {
   s.impostazioni = {
     ...s.impostazioni,
     inizioAnno: inizio.y, inizioMese: inizio.m, fineAnno,
-    saldoIniziale: r.saldoIniziale || 0, residuoIniziale: r.residuo || 0, plafondCarte: r.plafond || 0,
+    saldoIniziale: r.saldoIniziale || 0, plafondCarte: r.plafond || 0,
   };
   if (Array.isArray(r.frasi)) s.impostazioni.frasi = clona(r.frasi);
   s.saldoCorrente = {
@@ -86,7 +88,9 @@ export function daCompilazione(r, oggi) {
     welfare: r.corrente?.welfare || 0, residuoCarte: r.corrente?.residuoCarte || 0,
   };
   // id: quelli esistenti restano, i nuovi non devono coincidere con nessuno di loro
-  const usati = new Set([...(r.periodiche || []), ...(r.straordinarie || []), ...(r.salvadanai || [])]
+  const elencoFin = Array.isArray(r.finanziamenti) ? r.finanziamenti
+    : (r.residuo || r.rata ? [{ nome: 'Finanziamento', residuo: r.residuo || 0, rata: r.rata || 0 }] : []);
+  const usati = new Set([...(r.periodiche || []), ...(r.straordinarie || []), ...(r.salvadanai || []), ...elencoFin]
     .map((x) => x.id).filter(Boolean));
   let n = 0;
   const nuovoId = (p) => {
@@ -117,7 +121,13 @@ export function daCompilazione(r, oggi) {
   if (r.entrate) primo.entrate = r.entrate;
   if (r.spese) primo.spese = r.spese;
   if (r.valoreBuono) primo.valoreBuono = r.valoreBuono;
-  if (r.rata) primo.rata = r.rata;
+  for (const f of elencoFin) {
+    if (!(f.residuo > 0) && !f.rata && !f.nome?.trim()) continue;
+    s.finanziamenti.push({
+      id: f.id || nuovoId('f'), nome: f.nome?.trim() || 'Finanziamento',
+      residuo: Math.abs(f.residuo || 0), rata: Math.abs(f.rata || 0),
+    });
+  }
   const salv = {};
   (r.salvadanai || []).filter((x) => x.nome?.trim()).forEach((x) => {
     const id = x.id || nuovoId('s');
@@ -134,6 +144,7 @@ export function daCompilazione(r, oggi) {
   // valori inseriti mese per mese: restano quelli dei mesi dopo l'inizio e l'Extra del primo mese
   if (r.mesiPrecedenti) {
     const ids = new Set(s.salvadanai.map((x) => x.id));
+    const idsFin = new Set(s.finanziamenti.map((x) => x.id));
     for (const [km, m] of Object.entries(r.mesiPrecedenti)) {
       if (!/^\d{4}-\d{2}$/.test(km) || km < k) continue;
       if (km === k) {
@@ -144,6 +155,10 @@ export function daCompilazione(r, oggi) {
       if (copia.salvadanai) {
         copia.salvadanai = Object.fromEntries(Object.entries(copia.salvadanai).filter(([id]) => ids.has(id)));
         if (!Object.keys(copia.salvadanai).length) delete copia.salvadanai;
+      }
+      if (copia.rate) {
+        copia.rate = Object.fromEntries(Object.entries(copia.rate).filter(([id]) => idsFin.has(id)));
+        if (!Object.keys(copia.rate).length) delete copia.rate;
       }
       conMese(s, km, copia);
     }
@@ -191,9 +206,12 @@ export function aCompilazione(s, oggi) {
       frasi: clona(sv.frasi || FRASI_SALVADANAIO_PREDEFINITE),
     };
   });
+  const finanziamenti = (s.finanziamenti || []).map((f) => ({
+    id: f.id, nome: f.nome, residuo: f.residuo, rata: primo?.finanziamenti[f.id]?.rataImpostata ?? f.rata,
+  }));
   return {
     inizio, anni: Math.max(1, imp.fineAnno - imp.inizioAnno),
-    saldoIniziale: imp.saldoIniziale, residuo: imp.residuoIniziale, rata: primo?.rata ?? 0,
+    saldoIniziale: imp.saldoIniziale, finanziamenti,
     entrate: primo?.entrate ?? 0, spese: primo?.spese ?? 0, valoreBuono: primo?.valoreBuono ?? 0,
     corrente: { ...s.saldoCorrente }, plafond: imp.plafondCarte,
     periodiche, straordinarie, salvadanai,
@@ -203,12 +221,13 @@ export function aCompilazione(s, oggi) {
 
 // ---------- Mesi inseriti a mano ----------
 
-const CAMPI_TRASCINATI = ['entrate', 'spese', 'valoreBuono', 'rata'];
+const CAMPI_TRASCINATI = ['entrate', 'spese', 'valoreBuono'];
 
 export function meseVuoto(m) {
   if (!m) return true;
   return CAMPI_TRASCINATI.every((c) => m[c] == null) && !(m.extra) &&
-    (!m.salvadanai || Object.keys(m.salvadanai).length === 0);
+    (!m.salvadanai || Object.keys(m.salvadanai).length === 0) &&
+    (!m.rate || Object.keys(m.rate).length === 0);
 }
 
 function conMese(s, k, m) {
@@ -222,19 +241,25 @@ function conMese(s, k, m) {
  * Calcola mese per mese. Regole:
  *  Utile = Entrate nette − Spese fisse
  *  Saldo contabile = precedente + Utile + Extra (manuale + voci straordinarie) + Periodico
- *  Residuo finanziamenti = precedente − Rata (mai sotto zero)
+ *  Residuo di ogni finanziamento = precedente − sua Rata (mai sotto zero)
+ *  Residuo finanziamenti = somma dei residui; Rata finanziamenti = somma delle rate pagate
  *  Saldo netto totale = Saldo contabile − salvadanai − residuo finanziamenti
+ * Le rate non toccano il Saldo contabile: sono già comprese nelle Spese fisse.
  */
 export function proiezione(s) {
   const imp = s.impostazioni;
   const inizio = { y: imp.inizioAnno, m: imp.inizioMese };
   const fine = { y: imp.fineAnno, m: 12 };
   const idSalv = s.salvadanai.map((x) => x.id);
-  const v = { entrate: 0, spese: 0, valoreBuono: 0, rata: 0 };
+  const fin = s.finanziamenti || [];
+  const v = { entrate: 0, spese: 0, valoreBuono: 0 };
   const salv = {};
+  const rate = Object.fromEntries(fin.map((f) => [f.id, f.rata || 0]));
+  const residui = Object.fromEntries(fin.map((f) => [f.id, Math.max(0, f.residuo || 0)]));
   const applica = (m) => {
     for (const c of CAMPI_TRASCINATI) if (m[c] != null) v[c] = m[c];
     if (m.salvadanai) for (const [id, x] of Object.entries(m.salvadanai)) salv[id] = x;
+    if (m.rate) for (const [id, x] of Object.entries(m.rate)) if (id in rate) rate[id] = x;
   };
   // valori "a trascinamento" impostati prima dell'inizio
   Object.keys(s.mesi).filter((k) => indice(parseChiave(k)) < indice(inizio)).sort()
@@ -242,7 +267,6 @@ export function proiezione(s) {
 
   const righe = [];
   let saldo = imp.saldoIniziale;
-  let residuo = imp.residuoIniziale;
   for (let i = indice(inizio); i <= indice(fine); i++) {
     const ym = daIndice(i);
     const k = chiave(ym.y, ym.m);
@@ -258,7 +282,16 @@ export function proiezione(s) {
     const extraManuale = m.extra || 0;
     const utile = v.entrate - v.spese;
     saldo += utile + extraManuale + extraVoci + periodico;
-    residuo = Math.max(0, residuo - v.rata);
+    const finanziamenti = {};
+    let rata = 0;
+    let residuo = 0;
+    for (const f of fin) {
+      const pagata = Math.min(Math.max(0, rate[f.id]), residui[f.id]);
+      residui[f.id] -= pagata;
+      finanziamenti[f.id] = { rataImpostata: rate[f.id], rata: pagata, residuo: residui[f.id] };
+      rata += pagata;
+      residuo += residui[f.id];
+    }
     const salvadanai = {};
     const nettiSalv = {};
     let progressivo = saldo;
@@ -275,7 +308,7 @@ export function proiezione(s) {
       entrate: v.entrate, spese: v.spese, utile, valoreBuono: v.valoreBuono,
       extraManuale, extraVoci, extra: extraManuale + extraVoci, periodico,
       saldoContabile: saldo,
-      rata: v.rata, residuoFinanziamenti: residuo,
+      rata, residuoFinanziamenti: residuo, finanziamenti,
       saldoNettoFinanziamenti: saldo - residuo,
       salvadanai, saldoNettoSalvadanai: nettiSalv, totaleSalvadanai: totSalv,
       saldoAlNettoSalvadanai: saldo - totSalv,
@@ -283,6 +316,51 @@ export function proiezione(s) {
     });
   }
   return righe;
+}
+
+/**
+ * Mesi in cui conviene estinguere i finanziamenti senza mandare in negativo il Saldo contabile.
+ * I finanziamenti si estinguono uno alla volta, dal residuo più basso al più alto.
+ * Estinguere a fine mese t costa il residuo di quel mese; dal mese dopo la rata non si paga più
+ * (è compresa nelle Spese fisse), quindi per ogni mese u ≥ t il saldo diventa
+ * Saldo contabile(u) − residuo(u). Si sceglie il primo mese t (dal mese corrente in poi) in cui il
+ * saldo, tolti tutti i finanziamenti già estinti, resta ≥ 0 fino alla fine della proiezione.
+ * Restituisce [{ id, nome, indice, chiave, ym, importo }] (indice = posizione in righe, null se non
+ * si riesce prima della fine naturale o della proiezione; fineNaturale = indice del mese in cui finisce).
+ */
+export function estinzioni(s, righe, oggi) {
+  const fin = s.finanziamenti || [];
+  if (!fin.length || !righe.length) return [];
+  let da = righe.findIndex((r) => stessoMese(r.ym, oggi));
+  if (da < 0) da = indice(oggi) < indice(righe[0].ym) ? 0 : righe.length;
+  if (da >= righe.length) return [];
+  const scenario = righe.map((r) => r.saldoContabile);
+  const residuoDa = (f) => righe[da].finanziamenti[f.id]?.residuo ?? 0;
+  const ordinati = fin.filter((f) => residuoDa(f) > 0).sort((a, b) => residuoDa(a) - residuoDa(b));
+  const esito = [];
+  for (const f of ordinati) {
+    const res = righe.map((r) => r.finanziamenti[f.id]?.residuo ?? 0);
+    const fineNaturale = res.findIndex((x, i) => i >= da && x <= 0);
+    // minimo da qui alla fine di (scenario − residuo)
+    const minSuffisso = new Array(righe.length + 1).fill(Infinity);
+    for (let u = righe.length - 1; u >= 0; u--) minSuffisso[u] = Math.min(minSuffisso[u + 1], scenario[u] - res[u]);
+    let t = -1;
+    for (let i = da; i < righe.length; i++) {
+      if (res[i] <= 0) break;
+      if (minSuffisso[i] >= 0) { t = i; break; }
+    }
+    if (t < 0) {
+      esito.push({ id: f.id, nome: f.nome, indice: null, fineNaturale: fineNaturale < 0 ? null : fineNaturale });
+      continue;
+    }
+    for (let u = t; u < righe.length; u++) scenario[u] -= res[u];
+    esito.push({
+      id: f.id, nome: f.nome, indice: t, chiave: righe[t].chiave, ym: righe[t].ym, importo: res[t],
+      fineNaturale: fineNaturale < 0 ? null : fineNaturale,
+    });
+    da = t;
+  }
+  return esito;
 }
 
 // ---------- Home ----------
@@ -334,14 +412,20 @@ export function aperturaApp(s, oggi) {
 }
 
 /**
- * Ogni frase vale dalla sua soglia (inclusa) fino alla soglia successiva (esclusa).
- * Sotto la soglia più bassa, o in un intervallo con frase vuota, non si mostra nessuna frase.
+ * Una soglia negativa è superata quando il valore è minore della soglia; una soglia positiva (o zero)
+ * quando il valore la raggiunge o la supera. Fra le soglie superate vale la più lontana da zero:
+ * la più bassa fra le negative, la più alta fra le positive.
+ * Se nessuna soglia è superata, o la frase scelta è vuota, non si mostra nessuna frase.
  */
 export function frasePer(valore, frasi) {
   if (valore == null || !isFinite(valore)) return null;
   let scelta = null;
   for (const f of frasi || []) {
-    if (valore >= f.soglia && (scelta == null || f.soglia >= scelta.soglia)) scelta = f;
+    if (f.soglia < 0) {
+      if (valore < f.soglia && (scelta == null || f.soglia < scelta.soglia)) scelta = f;
+    } else if (valore >= f.soglia && (scelta == null || (scelta.soglia >= 0 && f.soglia >= scelta.soglia))) {
+      scelta = f;
+    }
   }
   const testo = scelta?.testo?.trim();
   return testo ? scelta.testo : null;
@@ -404,17 +488,27 @@ export function impostaCampi(s, ym, valori, applica) {
   return n;
 }
 
-/** Salva extra e rata del mese (la rata solo se diversa da quella ereditata) e poi i campi cambiati. */
-export function salvaMese(s, ym, extra, rata, cambi, applica) {
+/**
+ * Salva extra e rate del mese e poi i campi cambiati.
+ * rate: { idFinanziamento: rata }; una rata si salva nel mese solo se diversa da quella ereditata.
+ */
+export function salvaMese(s, ym, extra, rate, cambi, applica) {
   const righe = proiezione(s);
   const i = righe.findIndex((r) => stessoMese(r.ym, ym));
-  const rataEreditata = i > 0 ? righe[i - 1].rata : null;
   const n = clona(s);
   const k = chiave(ym.y, ym.m);
   const m = n.mesi[k] || { extra: 0 };
   m.extra = extra;
-  if (rataEreditata == null || rata !== rataEreditata) m.rata = rata;
-  else delete m.rata;
+  for (const [id, rata] of Object.entries(rate || {})) {
+    const f = (s.finanziamenti || []).find((x) => x.id === id);
+    if (!f) continue;
+    // rata del mese prima (o quella di base per il primo mese), senza contare la modifica di questo mese
+    const ereditata = i > 0 ? righe[i - 1].finanziamenti[id].rataImpostata : f.rata;
+    m.rate = m.rate || {};
+    if (rata === ereditata) delete m.rate[id];
+    else m.rate[id] = rata;
+    if (!Object.keys(m.rate).length) delete m.rate;
+  }
   conMese(n, k, m);
   return Object.keys(cambi).length ? impostaCampi(n, ym, cambi, applica) : n;
 }
@@ -496,6 +590,42 @@ export function eliminaVoce(s, id) {
   return { ...s, voci: s.voci.filter((v) => v.id !== id) };
 }
 
+/**
+ * Riordina le voci: ids è il nuovo ordine di un gruppo di voci (quelle visibili in una pagina).
+ * Le voci del gruppo occupano gli stessi posti di prima nell'elenco completo, nel nuovo ordine;
+ * le altre non si spostano.
+ */
+export function riordinaVoci(s, ids) {
+  const gruppo = new Set(ids);
+  const perId = new Map(s.voci.map((v) => [v.id, v]));
+  const coda = ids.filter((id) => perId.has(id));
+  if (coda.length !== gruppo.size) return s;
+  let j = 0;
+  return { ...s, voci: s.voci.map((v) => (gruppo.has(v.id) ? perId.get(coda[j++]) : v)) };
+}
+
+export function salvaFinanziamento(s, f) {
+  const n = clona(s);
+  n.finanziamenti = n.finanziamenti || [];
+  const i = n.finanziamenti.findIndex((x) => x.id === f.id);
+  if (i >= 0) n.finanziamenti[i] = f; else n.finanziamenti.push(f);
+  return n;
+}
+
+export function eliminaFinanziamento(s, id) {
+  const n = clona(s);
+  n.finanziamenti = (n.finanziamenti || []).filter((x) => x.id !== id);
+  for (const k of Object.keys(n.mesi)) {
+    const m = n.mesi[k];
+    if (m.rate) {
+      delete m.rate[id];
+      if (!Object.keys(m.rate).length) delete m.rate;
+    }
+    conMese(n, k, m);
+  }
+  return n;
+}
+
 export function salvaSalvadanaio(s, sv) {
   const n = clona(s);
   const i = n.salvadanai.findIndex((x) => x.id === sv.id);
@@ -564,6 +694,12 @@ export function normalizza(o) {
     })
     : [{ id: 'papa', nome: 'Papà', frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) },
       { id: 'diana', nome: 'Diana', frasi: clona(FRASI_SALVADANAIO_PREDEFINITE) }];
+  // finanziamenti: elenco (web) oppure residuo iniziale + rata mese per mese (app Android / versioni precedenti)
+  const conElenco = Array.isArray(o.finanziamenti);
+  const finanziamenti = conElenco
+    ? o.finanziamenti.map((f) => ({ id: String(f.id), nome: String(f.nome ?? ''), residuo: num(f.residuo), rata: num(f.rata) }))
+    : [];
+  const rateVecchie = [];
   const mesi = {};
   for (const [k, m] of Object.entries(o.mesi)) {
     const salv = { ...(m.salvadanai || {}) };
@@ -576,10 +712,25 @@ export function normalizza(o) {
     if (m.entrate != null) nm.entrate = m.entrate; else if (utileVecchio != null) nm.entrate = utileVecchio;
     if (m.spese != null) nm.spese = m.spese; else if (utileVecchio != null) nm.spese = 0;
     if (m.valoreBuono != null) nm.valoreBuono = m.valoreBuono;
-    if (m.rata != null) nm.rata = m.rata;
+    if (!conElenco && m.rata != null) rateVecchie.push([k, num(m.rata)]);
+    if (conElenco && m.rate && typeof m.rate === 'object') {
+      const r = Object.fromEntries(Object.entries(m.rate).filter(([, x]) => typeof x === 'number' && isFinite(x)));
+      if (Object.keys(r).length) nm.rate = r;
+    }
     if (Object.keys(salv).length) nm.salvadanai = salv;
     mesi[k] = nm;
   }
+  if (!conElenco && (num(i.residuoIniziale) > 0 || rateVecchie.some(([, x]) => x))) {
+    const kInizio = chiave(inizioAnno, inizioMese);
+    rateVecchie.sort(([a], [b]) => (a < b ? -1 : 1));
+    const f = { id: 'f1', nome: 'Finanziamento', residuo: num(i.residuoIniziale), rata: 0 };
+    for (const [k, x] of rateVecchie) {
+      if (k <= kInizio) f.rata = x;
+      else mesi[k].rate = { f1: x };
+    }
+    finanziamenti.push(f);
+  }
+  for (const k of Object.keys(mesi)) if (meseVuoto(mesi[k])) delete mesi[k];
   if (versione < 3 && i.valoreBuono != null) {
     const k = chiave(inizioAnno, inizioMese);
     mesi[k] = mesi[k] || { extra: 0 };
@@ -590,15 +741,34 @@ export function normalizza(o) {
     versione: VERSIONE_DATI,
     impostazioni: {
       inizioAnno, inizioMese, fineAnno: num(i.fineAnno, inizioAnno),
-      saldoIniziale: num(i.saldoIniziale), residuoIniziale: num(i.residuoIniziale),
+      saldoIniziale: num(i.saldoIniziale),
       plafondCarte: num(i.plafondCarte), frasi: Array.isArray(i.frasi) ? i.frasi : clona(FRASI_PREDEFINITE),
     },
     saldoCorrente: {
       saldo: num(c.saldo), nonAddebitato: num(c.nonAddebitato), nonAccreditato: num(c.nonAccreditato),
       buoniResidui: num(c.buoniResidui), welfare: num(c.welfare), residuoCarte: num(c.residuoCarte),
     },
-    voci, salvadanai, mesi,
+    voci, finanziamenti, salvadanai, mesi,
   };
   if (o.ultimoMeseAperto) s.ultimoMeseAperto = String(o.ultimoMeseAperto);
   return s;
+}
+
+/**
+ * Stato da scrivere nel file di backup. Oltre all'elenco dei finanziamenti contiene anche i campi
+ * dell'app Android (residuo iniziale totale e rata totale mese per mese), così l'app Android calcola
+ * lo stesso residuo. Rileggendo il file qui vale l'elenco e quei campi vengono ignorati.
+ */
+export function perBackup(s) {
+  const n = clona(s);
+  const righe = proiezione(s);
+  n.impostazioni.residuoIniziale = (s.finanziamenti || []).reduce((a, f) => a + Math.max(0, f.residuo || 0), 0);
+  let prima = null;
+  for (const r of righe) {
+    if (r.rata !== prima) {
+      n.mesi[r.chiave] = { extra: 0, ...n.mesi[r.chiave], rata: r.rata };
+      prima = r.rata;
+    }
+  }
+  return n;
 }
