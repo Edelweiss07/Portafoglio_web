@@ -11,7 +11,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.3.1';
+export const VERSIONE_APP = '1.3.2';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -764,6 +764,10 @@ function paginaImpostazioni() {
       <button type="button" class="btn btn-contorno pieno" data-azione="importa-backup">Importa backup</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="esporta-excel">Esporta in Excel (.xlsx)</button>
       <button type="button" class="btn btn-contorno pieno" data-azione="guidata">Compilazione guidata</button>`, { info: 'backup' })}
+    ${sezione("Condividi l'app", `<p class="nota">Manda questo indirizzo a chi vuole usare Portafoglio: ognuno avrà la sua app vuota, i tuoi dati restano solo su questo dispositivo.</p>
+      <p class="link-app"><a href="${esc(linkApp())}" target="_blank" rel="noopener">${esc(linkApp())}</a></p>
+      <button type="button" class="btn btn-primario pieno" data-azione="condividi-app">Condividi link</button>
+      <button type="button" class="btn btn-contorno pieno" data-azione="copia-link">Copia link</button>`, { info: 'condividi' })}
     ${sezione('Reset', `<p class="nota">Cancella voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata.</p>
       <button type="button" class="btn btn-pericolo pieno" data-azione="cancella-tutto">Cancella tutti i dati</button>`, { info: 'reset' })}
     <p class="nota centro">Portafoglio – versione ${VERSIONE_APP} (web)</p>
@@ -829,6 +833,41 @@ function dialogoFinanziamento(f, nuovo) {
     titolo: `Eliminare "${f.nome}"?`, testo: 'Verranno cancellate anche le rate modificate mese per mese.', ok: 'Elimina', pericolo: true,
     onOk: () => { aggiorna(M.eliminaFinanziamento(stato, f.id)); chiudi(); },
   }));
+}
+
+// ---------- Condivisione dell'app ----------
+
+// L'indirizzo della web app, ricavato dalla pagina aperta (senza index.html, #, ?): vale ovunque sia pubblicata.
+function linkApp() {
+  return new URL('./', location.href).href;
+}
+
+async function copiaLink() {
+  const url = linkApp();
+  try {
+    await navigator.clipboard.writeText(url);
+    avviso('Link copiato');
+  } catch {
+    // browser vecchi o contesto non sicuro: copia tramite un campo di testo temporaneo
+    const t = document.createElement('textarea');
+    t.value = url;
+    t.setAttribute('readonly', '');
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    const ok = document.execCommand('copy');
+    t.remove();
+    avviso(ok ? 'Link copiato' : `Copia questo indirizzo: ${url}`);
+  }
+}
+
+async function condividiApp() {
+  const dati = { title: 'Portafoglio', text: 'Portafoglio: l\'app per tenere sotto controllo i conti di casa e i risparmi.', url: linkApp() };
+  if (navigator.share) {
+    try { await navigator.share(dati); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  copiaLink();
 }
 
 const dopoRender = {
@@ -981,6 +1020,8 @@ document.addEventListener('click', (ev) => {
     case 'nuovo-finanziamento':
       dialogoFinanziamento({ id: `f${Date.now().toString(36)}`, nome: '', residuo: 0, rata: 0 }, true);
       break;
+    case 'condividi-app': condividiApp(); break;
+    case 'copia-link': copiaLink(); break;
     case 'esporta-backup': esportaBackup(); break;
     case 'importa-backup': importaBackup(); break;
     case 'esporta-excel': esportaExcel(); break;
