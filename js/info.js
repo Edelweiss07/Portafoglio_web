@@ -142,7 +142,7 @@ ${SMART}
 
 ${FRASI_SMART}`],
 
-  impostazioni: ['Impostazioni', `Impostazioni generali dell'app: voci periodiche e straordinarie (pulsante "Gestisci le voci"), periodo della proiezione, valori di partenza, finanziamenti, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel e reset.
+  impostazioni: ['Impostazioni', `Impostazioni generali dell'app: voci periodiche e straordinarie (pulsante "Gestisci le voci"), periodo della proiezione, valori di partenza, finanziamenti, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel, link per condividere l'app e reset.
 In fondo trovi il numero di versione.`],
 
   periodo: ['Periodo della proiezione', `• Mese e anno di inizio: il primo mese calcolato.
@@ -185,6 +185,11 @@ ${SMART}`],
 • Esporta in Excel: crea un foglio di calcolo (.xlsx) con Home, Proiezione mese per mese, Voci, Salvadanai e Impostazioni. Si apre con Excel, Numbers o Google Fogli. È solo una copia da consultare: non si può reimportare.
 • Compilazione guidata: ti fa le domande passo passo per creare di nuovo il Portafoglio. Se ci sono già dati, le risposte sono precompilate con quelli: cambi solo quello che serve. Alla fine sostituisce i dati attuali; se esci prima, non cambia nulla.
 • A ogni esportazione scegli dove salvare il file: sul computer con la finestra "Salva con nome" (parte da Download), su telefono dal menu Condividi (Salva su File, Drive, e-mail…).`],
+
+  condividi: ["Condividi l'app", `L'indirizzo della web app, da mandare a chi vuole usarla.
+• Condividi link: apre il menu Condividi del telefono (WhatsApp, e-mail, Messaggi…). Se il browser non lo permette, il link viene copiato.
+• Copia link: copia l'indirizzo, da incollare dove vuoi.
+Chi apre il link trova l'app vuota, con la compilazione guidata: i tuoi dati non vengono condivisi, restano solo su questo dispositivo.`],
 
   reset: ['Reset', 'Cancella tutti i dati: voci, salvadanai, valori mensili e dati correnti. Subito dopo parte la compilazione guidata per ricominciare. L\'operazione non si può annullare: esporta prima un backup se vuoi conservarli.'],
 };

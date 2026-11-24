@@ -94,6 +94,8 @@ p { margin: 6px 0; }
 .mese-corrente { font-size: 1.5rem; font-weight: 500; }
 .vuoto { padding: 24px 16px; color: var(--testo-2); text-align: center; }
 .nota { font-size: 0.82rem; color: var(--testo-2); }
+.link-app { font-size: 0.88rem; overflow-wrap: anywhere; margin: 4px 0 8px; }
+.link-app a { color: var(--primario, inherit); }
 .centro { text-align: center; }
 .destra { display: flex; justify-content: flex-end; }
 .piccolo { font-size: 0.82rem; }
