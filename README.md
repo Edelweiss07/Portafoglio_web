@@ -59,7 +59,8 @@ un backup. Salva il file in un posto sicuro (File, iCloud Drive, Google Drive, e
 
 - Utile = Entrate nette − Spese fisse
 - Periodico = somma delle voci periodiche attive nel mese
-- Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico
+- Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico − Estinzioni + Rate risparmiate
+  (solo per i finanziamenti con "Estingui" attivo: residuo pagato nel mese scelto, rate non più pagate dopo)
 - Residuo di ogni finanziamento = Residuo del mese prima − sua Rata; Residuo finanziamenti = somma dei residui
   (le rate sono già comprese nelle Spese fisse e non toccano il Saldo contabile)
 - Estinzione: per ogni finanziamento, dal residuo più basso al più alto, il primo mese da cui pagando il

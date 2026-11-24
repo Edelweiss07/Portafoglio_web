@@ -126,6 +126,7 @@ export function daCompilazione(r, oggi) {
     s.finanziamenti.push({
       id: f.id || nuovoId('f'), nome: f.nome?.trim() || 'Finanziamento',
       residuo: Math.abs(f.residuo || 0), rata: Math.abs(f.rata || 0),
+      ...(f.estinzione ? { estinzione: f.estinzione } : {}),
     });
   }
   const salv = {};
@@ -208,6 +209,7 @@ export function aCompilazione(s, oggi) {
   });
   const finanziamenti = (s.finanziamenti || []).map((f) => ({
     id: f.id, nome: f.nome, residuo: f.residuo, rata: primo?.finanziamenti[f.id]?.rataImpostata ?? f.rata,
+    ...(f.estinzione ? { estinzione: f.estinzione } : {}),
   }));
   return {
     inizio, anni: Math.max(1, imp.fineAnno - imp.inizioAnno),
@@ -245,6 +247,9 @@ function conMese(s, k, m) {
  *  Residuo finanziamenti = somma dei residui; Rata finanziamenti = somma delle rate pagate
  *  Saldo netto totale = Saldo contabile − salvadanai − residuo finanziamenti
  * Le rate non toccano il Saldo contabile: sono già comprese nelle Spese fisse.
+ * Finanziamento con estinzione ('AAAA-MM'): in quel mese, dopo la rata, si paga tutto il residuo
+ * (tolto dal Saldo contabile); nei mesi dopo le rate che si sarebbero pagate restano sul conto
+ * (sommate al Saldo contabile come "rate risparmiate").
  */
 export function proiezione(s) {
   const imp = s.impostazioni;
@@ -256,6 +261,9 @@ export function proiezione(s) {
   const salv = {};
   const rate = Object.fromEntries(fin.map((f) => [f.id, f.rata || 0]));
   const residui = Object.fromEntries(fin.map((f) => [f.id, Math.max(0, f.residuo || 0)]));
+  // residuo che ci sarebbe senza estinzione: serve a sapere quali rate si risparmiano
+  const ombra = { ...residui };
+  const estinto = {};
   const applica = (m) => {
     for (const c of CAMPI_TRASCINATI) if (m[c] != null) v[c] = m[c];
     if (m.salvadanai) for (const [id, x] of Object.entries(m.salvadanai)) salv[id] = x;
@@ -281,17 +289,32 @@ export function proiezione(s) {
     }
     const extraManuale = m.extra || 0;
     const utile = v.entrate - v.spese;
-    saldo += utile + extraManuale + extraVoci + periodico;
     const finanziamenti = {};
     let rata = 0;
     let residuo = 0;
+    let estinzione = 0;
+    let rateRisparmiate = 0;
     for (const f of fin) {
-      const pagata = Math.min(Math.max(0, rate[f.id]), residui[f.id]);
-      residui[f.id] -= pagata;
-      finanziamenti[f.id] = { rataImpostata: rate[f.id], rata: pagata, residuo: residui[f.id] };
+      const rataOmbra = Math.min(Math.max(0, rate[f.id]), ombra[f.id]);
+      ombra[f.id] -= rataOmbra;
+      let pagata = 0;
+      let saldato = 0;
+      if (estinto[f.id]) rateRisparmiate += rataOmbra;
+      else {
+        pagata = rataOmbra;
+        residui[f.id] -= pagata;
+        if (f.estinzione === k && residui[f.id] > 0) {
+          saldato = residui[f.id];
+          residui[f.id] = 0;
+          estinzione += saldato;
+        }
+        if (f.estinzione && f.estinzione <= k) estinto[f.id] = true;
+      }
+      finanziamenti[f.id] = { rataImpostata: rate[f.id], rata: pagata, residuo: residui[f.id], estinzione: saldato };
       rata += pagata;
       residuo += residui[f.id];
     }
+    saldo += utile + extraManuale + extraVoci + periodico - estinzione + rateRisparmiate;
     const salvadanai = {};
     const nettiSalv = {};
     let progressivo = saldo;
@@ -308,7 +331,7 @@ export function proiezione(s) {
       entrate: v.entrate, spese: v.spese, utile, valoreBuono: v.valoreBuono,
       extraManuale, extraVoci, extra: extraManuale + extraVoci, periodico,
       saldoContabile: saldo,
-      rata, residuoFinanziamenti: residuo, finanziamenti,
+      rata, residuoFinanziamenti: residuo, finanziamenti, estinzione, rateRisparmiate,
       saldoNettoFinanziamenti: saldo - residuo,
       salvadanai, saldoNettoSalvadanai: nettiSalv, totaleSalvadanai: totSalv,
       saldoAlNettoSalvadanai: saldo - totSalv,
@@ -329,6 +352,11 @@ export function proiezione(s) {
  * si riesce prima della fine naturale o della proiezione; fineNaturale = indice del mese in cui finisce).
  */
 export function estinzioni(s, righe, oggi) {
+  // i punti si calcolano sempre sulla proiezione senza estinzioni attive
+  if ((s.finanziamenti || []).some((f) => f.estinzione)) {
+    s = senzaEstinzioni(s);
+    righe = proiezione(s);
+  }
   const fin = s.finanziamenti || [];
   if (!fin.length || !righe.length) return [];
   let da = righe.findIndex((r) => stessoMese(r.ym, oggi));
@@ -604,6 +632,23 @@ export function riordinaVoci(s, ids) {
   return { ...s, voci: s.voci.map((v) => (gruppo.has(v.id) ? perId.get(coda[j++]) : v)) };
 }
 
+/** Stato con tutte le estinzioni disattivate. */
+export function senzaEstinzioni(s) {
+  return { ...s, finanziamenti: (s.finanziamenti || []).map(({ estinzione: _x, ...f }) => f) };
+}
+
+/** Attiva (chiave 'AAAA-MM') o disattiva (null) l'estinzione di un finanziamento. */
+export function impostaEstinzione(s, id, k) {
+  return {
+    ...s,
+    finanziamenti: (s.finanziamenti || []).map((f) => {
+      if (f.id !== id) return f;
+      const { estinzione: _x, ...resto } = f;
+      return k ? { ...resto, estinzione: k } : resto;
+    }),
+  };
+}
+
 export function salvaFinanziamento(s, f) {
   const n = clona(s);
   n.finanziamenti = n.finanziamenti || [];
@@ -697,7 +742,11 @@ export function normalizza(o) {
   // finanziamenti: elenco (web) oppure residuo iniziale + rata mese per mese (app Android / versioni precedenti)
   const conElenco = Array.isArray(o.finanziamenti);
   const finanziamenti = conElenco
-    ? o.finanziamenti.map((f) => ({ id: String(f.id), nome: String(f.nome ?? ''), residuo: num(f.residuo), rata: num(f.rata) }))
+    ? o.finanziamenti.map((f) => {
+      const x = { id: String(f.id), nome: String(f.nome ?? ''), residuo: num(f.residuo), rata: num(f.rata) };
+      if (typeof f.estinzione === 'string' && /^\d{4}-\d{2}$/.test(f.estinzione)) x.estinzione = f.estinzione;
+      return x;
+    })
     : [];
   const rateVecchie = [];
   const mesi = {};
@@ -765,9 +814,10 @@ export function perBackup(s) {
   n.impostazioni.residuoIniziale = (s.finanziamenti || []).reduce((a, f) => a + Math.max(0, f.residuo || 0), 0);
   let prima = null;
   for (const r of righe) {
-    if (r.rata !== prima) {
-      n.mesi[r.chiave] = { extra: 0, ...n.mesi[r.chiave], rata: r.rata };
-      prima = r.rata;
+    const tot = r.rata + r.estinzione;
+    if (tot !== prima) {
+      n.mesi[r.chiave] = { extra: 0, ...n.mesi[r.chiave], rata: tot };
+      prima = tot;
     }
   }
   return n;

@@ -86,7 +86,7 @@ Nei dettagli di ogni mese il pulsante "Parametri del mese" apre i campi da compi
 Formule:
 • Utile = Entrate nette − Spese fisse.
 • Periodico = somma delle voci periodiche attive nel mese.
-• Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico.
+• Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico (− residuo pagato e + rate risparmiate, se hai attivato l'estinzione di un finanziamento).
 • Residuo di ogni finanziamento = Residuo del mese prima − sua Rata; Residuo finanziamenti = somma dei residui.
 • Totale salvadanai = somma dei saldi dei salvadanai.
 • Saldo al netto dei salvadanai = Saldo contabile − Totale salvadanai.
@@ -94,6 +94,7 @@ Formule:
 • Saldo netto totale = Saldo contabile − Totale salvadanai − Residuo finanziamenti.
 
 Grafici: "Andamento" mostra il Saldo contabile su tutto il periodo. I punti verdi numerati indicano da quando puoi estinguere ogni finanziamento senza che il saldo vada mai in negativo: si parte da quello con il residuo più basso, poi il successivo tenendo conto dei soldi già usati. Pagato il residuo, le rate dei mesi dopo restano sul conto (sono comprese nelle Spese fisse).
+Il pulsante "Estingui" accanto a ogni finanziamento ricalcola tutta la proiezione (anche il Target della Home) come se pagassi il residuo in quel mese: il Saldo contabile scende del residuo e dal mese dopo risale delle rate risparmiate. La linea tratteggiata mostra il saldo senza estinzioni. Tocca "✓ Estinto" per tornare indietro.
 "Extra di fine mese" mostra mese per mese le Disponibilità riportate e le voci straordinarie.
 
 ${GRASSETTO}`],
@@ -162,7 +163,7 @@ La rata non viene tolta dal Saldo contabile: deve essere già compresa nelle Spe
 • Residuo = Residuo del mese prima − Rata (mai sotto zero).
 • Residuo finanziamenti = somma dei residui; entra nel Saldo al netto dei finanziamenti e nel Saldo netto totale.
 
-Nel grafico "Andamento" della Proiezione vedi da quale mese puoi estinguere ogni finanziamento senza andare in negativo, dal residuo più basso al più alto.`],
+Nel grafico "Andamento" della Proiezione vedi da quale mese puoi estinguere ogni finanziamento senza andare in negativo, dal residuo più basso al più alto; con il pulsante "Estingui" la proiezione viene ricalcolata con l'estinzione in quel mese.`],
 
   parametri: ['Parametri', `• Disponibilità carte (plafond): il limite mensile delle carte di credito. Serve a calcolare le Spese carte attuali = Plafond − Residuo carte.
 Il valore del buono pasto si imposta mese per mese con il pulsante "Parametri del mese".`],

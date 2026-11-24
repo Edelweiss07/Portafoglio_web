@@ -11,7 +11,7 @@ import {
   sezione, testoHtml,
 } from './ui.js';
 
-export const VERSIONE_APP = '1.3.0';
+export const VERSIONE_APP = '1.3.1';
 const CHIAVE_STATO = 'portafoglio.stato';
 const CHIAVE_BACKUP = 'portafoglio.ultimoBackup';
 
@@ -272,13 +272,16 @@ function cardMese(r, est) {
       <span class="mese-saldo"><small>Saldo contabile previsto</small><strong class="${classeImporto(r.saldoContabile)}">${euro(r.saldoContabile)}</strong></span>
       <span class="freccia">${ICONE.giu}</span>
     </button>
-    ${qui.map((e) => `<p class="badge-estinzione">${est.indexOf(e) + 1} · Puoi estinguere ${esc(e.nome)} con ${euro(e.importo)}</p>`).join('')}
+    ${finanziamenti().filter((f) => r.finanziamenti[f.id]?.estinzione).map((f) => `<p class="badge-estinzione">Estinto ${esc(f.nome)}: ${euro(r.finanziamenti[f.id].estinzione)}</p>`).join('')}
+    ${qui.filter((e) => !finanziamenti().find((f) => f.id === e.id)?.estinzione).map((e) => `<p class="badge-estinzione">${est.indexOf(e) + 1} · Puoi estinguere ${esc(e.nome)} con ${euro(e.importo)}</p>`).join('')}
     <div class="mese-dettagli"${aperto ? '' : ' hidden'}>
     ${piccola('Entrate nette', r.entrate)}${piccola('Spese fisse', -r.spese)}
     ${piccola('Utile (entrate − spese)', r.utile, true)}
     ${r.extraManuale ? piccola('Extra (manuale)', r.extraManuale) : ''}
     ${r.extraVoci ? piccola('Extra (voci straordinarie)', r.extraVoci, true) : ''}
     ${r.periodico ? piccola('Periodico', r.periodico, true) : ''}
+    ${r.estinzione ? piccola('Estinzione finanziamenti', -r.estinzione, true) : ''}
+    ${r.rateRisparmiate ? piccola('Rate risparmiate (finanziamenti estinti)', r.rateRisparmiate, true) : ''}
     ${piccola('Valore buono pasto', r.valoreBuono)}<hr>
     ${salv}${stato.salvadanai.length ? piccola('Totale salvadanai', r.totaleSalvadanai, true) : ''}
     ${righeFinanziamenti(r)}<hr>
@@ -291,19 +294,48 @@ function cardMese(r, est) {
   </section>`;
 }
 
-/** Elenco sotto il grafico Andamento: quando si può estinguere ogni finanziamento. */
+/**
+ * Elenco sotto il grafico Andamento: quando si può estinguere ogni finanziamento,
+ * con il pulsante che ricalcola la proiezione con l'estinzione in quel mese.
+ */
 function elencoEstinzioni(est) {
-  if (!est.length) return '';
+  if (!est.length && !finanziamenti().some((f) => f.estinzione)) return '';
   const mese = (ym) => `${NOMI_MESI_LUNGHI[ym.m - 1].toLowerCase()} ${ym.y}`;
+  const meseK = (k) => mese(M.parseChiave(k));
+  const attivo = (id) => finanziamenti().find((f) => f.id === id)?.estinzione;
+  const pulsante = (e) => {
+    const k = attivo(e.id);
+    if (k) {
+      return `<button type="button" class="btn-estingui on" data-estingui="${esc(e.id)}" aria-pressed="true"
+        aria-label="Togli l'estinzione di ${esc(e.nome)} dalla proiezione">✓ Estinto</button>`;
+    }
+    return e.indice == null ? '' : `<button type="button" class="btn-estingui" data-estingui="${esc(e.id)}" data-mese="${e.chiave}" aria-pressed="false"
+      aria-label="Ricalcola la proiezione estinguendo ${esc(e.nome)} a ${mese(e.ym)}">Estingui</button>`;
+  };
+  const sposta = (e) => {
+    const k = attivo(e.id);
+    if (!k || e.indice == null || k === e.chiave) return '';
+    return `<br><small>Nella proiezione è estinto a ${meseK(k)}. <button type="button" class="btn-estingui piccolo-btn" data-estingui="${esc(e.id)}" data-mese="${e.chiave}" data-sposta>Sposta a ${mese(e.ym)}</button></small>`;
+  };
+  const dettaglio = (e) => {
+    if (e.indice != null) return `da ${mese(e.ym)} con ${euro(e.importo)}`;
+    if (attivo(e.id)) return `estinto a ${meseK(attivo(e.id))}; con i dati attuali non si potrebbe senza andare in negativo`;
+    return `non si può estinguere prima senza andare in negativo${e.fineNaturale != null ? `; finisce da solo a ${mese(righe[e.fineNaturale].ym)}` : ''}`;
+  };
+  // finanziamenti estinti che non compaiono più nell'elenco (es. estinzione in un mese passato)
+  const altri = finanziamenti().filter((f) => f.estinzione && !est.some((e) => e.id === f.id))
+    .map((f) => ({ id: f.id, nome: f.nome, indice: null }));
+  const voci = [...est, ...altri];
   return `<div class="estinzioni"><p class="etichetta">Estinzione dei finanziamenti (dal residuo più basso)</p>
-    ${est.map((e, i) => (e.indice != null
-    ? `<p><span class="marcatore fermo">${i + 1}</span><span><strong>${esc(e.nome)}</strong>: da ${mese(e.ym)} con ${euro(e.importo)}</span></p>`
-    : `<p><span class="marcatore fermo spento-m">–</span><span><strong>${esc(e.nome)}</strong>: non si può estinguere prima senza andare in negativo${e.fineNaturale != null ? `; finisce da solo a ${mese(righe[e.fineNaturale].ym)}` : ''}</span></p>`)).join('')}
-    <p class="nota">Il primo mese da cui, pagando il residuo, il Saldo contabile non va mai sotto zero fino alla fine della proiezione (contando le rate risparmiate dopo).</p></div>`;
+    ${voci.map((e, i) => `<p class="voce-estinzione"><span class="marcatore fermo${e.indice == null ? ' spento-m' : ''}">${e.indice == null ? '–' : i + 1}</span>
+      <span><strong>${esc(e.nome)}</strong>: ${dettaglio(e)}${sposta(e)}</span>${pulsante(e)}</p>`).join('')}
+    <p class="nota">Il primo mese da cui, pagando il residuo, il Saldo contabile non va mai sotto zero fino alla fine della proiezione (contando le rate risparmiate dopo). "Estingui" ricalcola la proiezione con il residuo pagato in quel mese; toccalo di nuovo per tornare indietro.</p></div>`;
 }
 
 function paginaProiezione() {
   const est = M.estinzioni(stato, righe, oggi());
+  // con estinzioni attive si mostra anche il saldo di prima, tratteggiato
+  const base = finanziamenti().some((f) => f.estinzione) ? M.proiezione(M.senzaEstinzioni(stato)) : null;
   const marcatori = est.filter((e) => e.indice != null)
     .map((e) => ({ indice: e.indice, etichetta: String(est.indexOf(e) + 1), titolo: `${e.nome}: ${meseTxt(e.ym)}` }));
   return pagerAnni('proiezione', (anno) => {
@@ -314,7 +346,8 @@ function paginaProiezione() {
     const ultimo = delAnno[delAnno.length - 1];
     return `<div class="contenuto">
       ${graficoLinee('Andamento', [
-        { nome: 'Saldo contabile', colore: COLORI.contabile, valori: righe.map((r) => r.saldoContabile) },
+        { nome: finanziamenti().some((f) => f.estinzione) ? 'Saldo contabile con le estinzioni' : 'Saldo contabile', colore: COLORI.contabile, valori: righe.map((r) => r.saldoContabile) },
+        ...(base ? [{ nome: 'Senza estinzioni', colore: 'var(--testo-2)', tratteggio: true, valori: base.map((r) => r.saldoContabile) }] : []),
       ], [i0, i1], `Tutto il periodo, ${anno} evidenziato`, marcatori, elencoEstinzioni(est))}
       ${graficoBarre('Extra di fine mese', NOMI_MESI.map((m) => m[0]), [
         { nome: 'Disponibilità riportate / extra manuali', colore: COLORI.delta, valori: mesi.map((r) => r?.extraManuale ?? 0) },
@@ -914,6 +947,14 @@ document.addEventListener('click', (ev) => {
   }
   if (t.dataset.modificaSalv) { dialogoSalvadanaio(stato.salvadanai.find((x) => x.id === t.dataset.modificaSalv), false); return; }
   if (t.dataset.valoreSalv) { dialogoValoreSalvadanaio(t.dataset.valoreSalv, t.dataset.mese); return; }
+  if (t.dataset.estingui) {
+    const f = finanziamenti().find((x) => x.id === t.dataset.estingui);
+    if (!f) return;
+    const k = f.estinzione && !t.hasAttribute('data-sposta') ? null : t.dataset.mese;
+    aggiorna(M.impostaEstinzione(stato, f.id, k));
+    avviso(k ? `Proiezione ricalcolata: ${f.nome} estinto a ${meseTxt(M.parseChiave(k)).toLowerCase()}` : `Estinzione di ${f.nome} tolta dalla proiezione`);
+    return;
+  }
   if (t.dataset.modificaFin) { dialogoFinanziamento(finanziamenti().find((x) => x.id === t.dataset.modificaFin), false); return; }
   if (t.dataset.espandiMese) {
     const k = t.dataset.espandiMese;

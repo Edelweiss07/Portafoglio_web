@@ -7,7 +7,7 @@ export const COLORI = {
 };
 
 const legenda = (serie) => `<div class="legenda">${serie.map((s) =>
-  `<span><i style="background:${s.colore}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
+  `<span><i class="${s.tratteggio ? 'tratteggio' : ''}" style="${s.tratteggio ? `border-color:${s.colore}` : `background:${s.colore}`}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
 
 const scala = (min, max) => `<div class="scala"><span>min ${euro(min)}</span><span>max ${euro(max)}</span></div>`;
 
@@ -17,7 +17,7 @@ function card(titolo, sottotitolo, corpo, serie, dopo = '') {
 }
 
 /**
- * serie: [{ nome, colore, valori }]; evidenzia: [primo, ultimo] indici da evidenziare.
+ * serie: [{ nome, colore, valori, tratteggio? }]; evidenzia: [primo, ultimo] indici da evidenziare.
  * marcatori: [{ indice, etichetta, titolo }] punti evidenziati sulla prima serie (con linea verticale);
  * dopo: HTML aggiunto in fondo alla scheda.
  */
@@ -35,7 +35,7 @@ export function graficoLinee(titolo, serie, evidenzia, sottotitolo, marcatori = 
   if (evidenzia && evidenzia[0] >= 0) {
     sfondo = `<rect x="${x(evidenzia[0])}" y="0" width="${Math.max(2, x(evidenzia[1]) - x(evidenzia[0]))}" height="${H}" class="evid"/>`;
   }
-  const linee = serie.map((s) => `<polyline fill="none" stroke="${s.colore}" stroke-width="2" vector-effect="non-scaling-stroke"
+  const linee = serie.map((s) => `<polyline fill="none" stroke="${s.colore}" stroke-width="2" vector-effect="non-scaling-stroke"${s.tratteggio ? ' stroke-dasharray="5 4"' : ''}
     stroke-linejoin="round" points="${s.valori.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`).join('');
   const validi = marcatori.filter((m) => m.indice != null && m.indice >= 0 && m.indice < n);
   const verticali = validi.map((m) => `<line x1="${x(m.indice).toFixed(1)}" x2="${x(m.indice).toFixed(1)}" y1="0" y2="${H}"
