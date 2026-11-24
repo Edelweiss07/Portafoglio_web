@@ -7,15 +7,16 @@ const vicino = (a, b) => assert.ok(Math.abs(a - b) < 0.001, `atteso ${b}, ottenu
 
 const stato = () => ({
   versione: 5,
-  impostazioni: { inizioAnno: 2026, inizioMese: 1, fineAnno: 2026, saldoIniziale: 1000, residuoIniziale: 1000, plafondCarte: 1000, frasi: M.FRASI_PREDEFINITE },
+  impostazioni: { inizioAnno: 2026, inizioMese: 1, fineAnno: 2026, saldoIniziale: 1000, plafondCarte: 1000, frasi: M.FRASI_PREDEFINITE },
   saldoCorrente: { saldo: 2000, nonAddebitato: 200, nonAccreditato: 100, buoniResidui: 10, welfare: 50, residuoCarte: 700 },
   voci: [
     { id: 'a', nome: 'Assicurazione', importo: -300, tipo: 'PERIODICO', mesi: ['2026-02'] },
     { id: 'b', nome: 'Computer', importo: -1000, tipo: 'EXTRA', mesi: ['2026-03'], anno: 2026 },
   ],
+  finanziamenti: [{ id: 'f', nome: 'Auto', residuo: 1000, rata: 100 }],
   salvadanai: [{ id: 'x', nome: 'X', frasi: M.FRASI_SALVADANAIO_PREDEFINITE }, { id: 'y', nome: 'Y', frasi: M.FRASI_SALVADANAIO_PREDEFINITE }],
   mesi: {
-    '2026-01': { extra: 0, entrate: 2000, spese: 1500, valoreBuono: 8, rata: 100 },
+    '2026-01': { extra: 0, entrate: 2000, spese: 1500, valoreBuono: 8 },
     '2026-04': { extra: 250, salvadanai: { x: 300, y: 200 } },
     '2026-06': { extra: 0, spese: 1700 },
   },
@@ -105,17 +106,19 @@ test('apertura in un mese nuovo chiude il mese precedente', () => {
   assert.equal(M.aperturaApp(dopo, { y: 2026, m: 4 }).chiusura, null);
 });
 
-test('frasi motivazionali: dalla soglia fino alla successiva', () => {
-  const f = [{ soglia: 0, testo: 'pari' }, { soglia: -500, testo: 'sotto' }, { soglia: 500, testo: 'sopra' }];
-  assert.equal(M.frasePer(-2000, f), null); // sotto la soglia più bassa: nessuna frase
-  assert.equal(M.frasePer(-500, f), 'sotto');
-  assert.equal(M.frasePer(-1, f), 'sotto');
+test('frasi motivazionali: soglie negative sotto, positive sopra', () => {
+  const f = [{ soglia: 0, testo: 'pari' }, { soglia: -500, testo: 'sotto' }, { soglia: -1000, testo: 'molto sotto' }, { soglia: 500, testo: 'sopra' }];
+  assert.equal(M.frasePer(-2000, f), 'molto sotto'); // sotto entrambe le negative: la più bassa
+  assert.equal(M.frasePer(-1000, f), 'sotto'); // -1000 non è minore di -1000
+  assert.equal(M.frasePer(-501, f), 'sotto');
+  assert.equal(M.frasePer(-500, f), null); // nessuna soglia superata
+  assert.equal(M.frasePer(-1, f), null);
   assert.equal(M.frasePer(0, f), 'pari');
   assert.equal(M.frasePer(499, f), 'pari');
   assert.equal(M.frasePer(500, f), 'sopra');
   assert.equal(M.frasePer(800, f), 'sopra');
   assert.equal(M.frasePer(800, []), null);
-  // un intervallo con frase vuota non mostra nulla e non estende la frase precedente
+  // una frase vuota non mostra nulla e non estende la frase precedente
   const g = [{ soglia: 0, testo: 'pari' }, { soglia: 100, testo: '' }, { soglia: 500, testo: 'sopra' }];
   assert.equal(M.frasePer(50, g), 'pari');
   assert.equal(M.frasePer(200, g), null);
@@ -181,6 +184,7 @@ test('backup: andata e ritorno e migrazione dalla versione 1', () => {
   assert.deepEqual(n.mesi['2026-10'], { extra: 0, entrate: 550, spese: 0, valoreBuono: 7, salvadanai: { papa: 10 } });
   assert.equal(n.voci[0].anno, 2026);
   assert.deepEqual(n.salvadanai.map((x) => x.nome), ['Papà', 'Diana']);
+  assert.deepEqual(n.finanziamenti, []);
   assert.throws(() => M.normalizza({ a: 1 }));
 });
 
@@ -232,7 +236,7 @@ test('compilazione guidata precompilata: senza modifiche restituisce gli stessi 
   assert.deepEqual(r.inizio, { y: 2026, m: 1 });
   assert.equal(r.anni, 2);
   assert.equal(r.entrate, 2000);
-  assert.equal(r.rata, 100);
+  assert.deepEqual(r.finanziamenti, [{ id: 'f', nome: 'Auto', residuo: 1000, rata: 100 }]);
   const tari = r.periodiche.find((v) => v.nome === 'TARI');
   assert.deepEqual([tari.mese, tari.altriMesi, tari.entrata, tari.importo], [5, [11], false, 125]);
   assert.equal(r.salvadanai[1].senzaScadenza, true);
@@ -268,4 +272,96 @@ test('compilazione precompilata: salvadanaio tolto e voci nuove senza id in conf
   assert.deepEqual(n.mesi['2026-04'].salvadanai, { x: 300 });
   const ids = [...n.voci, ...n.salvadanai].map((x) => x.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test('più finanziamenti: residui separati e totale', () => {
+  const s = stato();
+  s.finanziamenti.push({ id: 'g', nome: 'Divano', residuo: 250, rata: 100 });
+  const r = M.proiezione(s);
+  assert.deepEqual(r.slice(0, 4).map((x) => x.finanziamenti.g.residuo), [150, 50, 0, 0]);
+  assert.deepEqual(r.slice(0, 4).map((x) => x.rata), [200, 200, 150, 100]);
+  vicino(r[3].residuoFinanziamenti, 600);
+  // rata cambiata da aprile in poi solo per l'auto
+  const n = M.salvaMese(s, { y: 2026, m: 4 }, 250, { f: 200, g: 100 }, {}, 'FINO_PROSSIMA');
+  assert.deepEqual(n.mesi['2026-04'].rate, { f: 200 });
+  assert.deepEqual(M.proiezione(n).slice(2, 6).map((x) => x.finanziamenti.f.residuo), [700, 500, 300, 100]);
+  // tornare alla rata ereditata toglie la modifica
+  assert.equal(M.salvaMese(n, { y: 2026, m: 4 }, 250, { f: 100 }, {}, 'FINO_PROSSIMA').mesi['2026-04'].rate, undefined);
+  const e = M.eliminaFinanziamento(n, 'f');
+  assert.equal(e.mesi['2026-04'].rate, undefined);
+  vicino(M.proiezione(e)[0].residuoFinanziamenti, 150);
+});
+
+test('estinzione dei finanziamenti: dal più basso, senza andare in negativo', () => {
+  const s = M.vuoto({ y: 2026, m: 1 });
+  s.impostazioni.saldoIniziale = 0;
+  s.mesi['2026-01'] = { extra: 0, entrate: 1000, spese: 500 };
+  s.finanziamenti = [
+    { id: 'grande', nome: 'Auto', residuo: 3000, rata: 200 },
+    { id: 'piccolo', nome: 'Telefono', residuo: 600, rata: 50 },
+  ];
+  const righe = M.proiezione(s);
+  const e = M.estinzioni(s, righe, { y: 2026, m: 1 });
+  assert.deepEqual(e.map((x) => x.id), ['piccolo', 'grande']);
+  // telefono: primo mese con saldo ≥ residuo (saldo 500·n, residuo 600 − 50·n) → n = 2 (febbraio)
+  assert.equal(e[0].chiave, '2026-02');
+  vicino(e[0].importo, 500);
+  // auto, dopo il telefono: 500·n − (600 − 50·n) − (3000 − 200·n) ≥ 0 → n ≥ 4.8 → maggio
+  assert.equal(e[1].chiave, '2026-05');
+  vicino(e[1].importo, 2000);
+  // dal mese corrente in poi
+  assert.equal(M.estinzioni(s, righe, { y: 2026, m: 7 })[0].chiave, '2026-07');
+  // una spesa a giugno: l'auto estinta prima manderebbe in negativo giugno e luglio → agosto
+  s.voci = [{ id: 'v', nome: 'Spesa', importo: -2000, tipo: 'EXTRA', anno: 2026, mesi: ['2026-06'] }];
+  const e2 = M.estinzioni(s, M.proiezione(s), { y: 2026, m: 1 });
+  assert.deepEqual(e2.map((x) => x.chiave), ['2026-02', '2026-08']);
+  // impossibile: resta senza mese
+  s.impostazioni.saldoIniziale = -100000;
+  assert.deepEqual(M.estinzioni(s, M.proiezione(s), { y: 2026, m: 1 }).map((x) => x.indice), [null, null]);
+});
+
+test('backup: finanziamenti verso e dalla versione Android', () => {
+  // backup con un solo residuo e rate mese per mese → un finanziamento
+  const vecchio = {
+    versione: 5,
+    impostazioni: { inizioAnno: 2026, inizioMese: 1, fineAnno: 2026, saldoIniziale: 0, residuoIniziale: 1000, plafondCarte: 0 },
+    saldoCorrente: { saldo: 0, nonAddebitato: 0, nonAccreditato: 0, buoniResidui: 0, welfare: 0, residuoCarte: 0 },
+    voci: [], salvadanai: [],
+    mesi: { '2026-01': { extra: 0, rata: 100 }, '2026-05': { extra: 0, rata: 150 } },
+  };
+  const n = M.normalizza(vecchio);
+  assert.deepEqual(n.finanziamenti, [{ id: 'f1', nome: 'Finanziamento', residuo: 1000, rata: 100 }]);
+  assert.deepEqual(n.mesi, { '2026-05': { extra: 0, rate: { f1: 150 } } });
+  assert.deepEqual(M.proiezione(n).map((r) => r.residuoFinanziamenti).slice(0, 6), [900, 800, 700, 600, 450, 300]);
+  // il backup contiene anche i campi Android, ma rileggendolo vale l'elenco
+  const s = stato();
+  s.finanziamenti.push({ id: 'g', nome: 'Divano', residuo: 250, rata: 100 });
+  const b = M.perBackup(s);
+  assert.equal(b.impostazioni.residuoIniziale, 1250);
+  assert.equal(b.mesi['2026-01'].rata, 200);
+  assert.equal(b.mesi['2026-03'].rata, 150);
+  assert.equal(b.mesi['2026-04'].rata, 100);
+  const android = M.normalizza({ ...b, finanziamenti: undefined });
+  assert.deepEqual(M.proiezione(android).map((r) => r.residuoFinanziamenti), M.proiezione(s).map((r) => r.residuoFinanziamenti));
+  const r = M.normalizza(JSON.parse(JSON.stringify(b)));
+  assert.deepEqual(r.finanziamenti, s.finanziamenti);
+  assert.deepEqual(r.mesi, s.mesi);
+});
+
+test('compilazione guidata: più finanziamenti', () => {
+  const s = M.daCompilazione({
+    inizio: { y: 2026, m: 1 }, anni: 1,
+    finanziamenti: [{ nome: 'Auto', residuo: 5000, rata: 200 }, { nome: '', residuo: 300, rata: 30 }, { nome: '', residuo: 0, rata: 0 }],
+  }, { y: 2026, m: 1 });
+  assert.deepEqual(s.finanziamenti.map((f) => [f.nome, f.residuo, f.rata]), [['Auto', 5000, 200], ['Finanziamento', 300, 30]]);
+  const r = M.aCompilazione(s, { y: 2026, m: 1 });
+  assert.deepEqual(M.daCompilazione(r, { y: 2026, m: 1 }).finanziamenti, s.finanziamenti);
+});
+
+test('riordino delle voci', () => {
+  const s = stato();
+  s.voci.push({ id: 'c', nome: 'Bollo', importo: -200, tipo: 'PERIODICO', mesi: [] });
+  // solo le periodiche (a, c) cambiano posto; la straordinaria b resta in mezzo
+  assert.deepEqual(M.riordinaVoci(s, ['c', 'a']).voci.map((v) => v.id), ['c', 'b', 'a']);
+  assert.equal(M.riordinaVoci(s, ['c', 'zz']), s);
 });

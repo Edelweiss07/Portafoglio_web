@@ -12,16 +12,20 @@ export function fogliDati(s, oggi) {
   const righe = M.proiezione(s);
   const r = M.riepilogo(s, oggi, righe);
   const salv = s.salvadanai;
+  const fin = s.finanziamenti || [];
+  const perFin = fin.length > 1;
 
   // 1. Proiezione mese per mese (i valori calcolati sono in grassetto, come nell'app)
   const intest = ['Mese', 'Entrate nette', 'Spese fisse', 'Utile', 'Extra manuale', 'Extra voci straordinarie',
     'Periodico', 'Saldo contabile', 'Valore buono pasto', 'Rata finanziamenti', 'Residuo finanziamenti',
+    ...(perFin ? fin.flatMap((f) => [`Rata ${f.nome}`, `Residuo ${f.nome}`]) : []),
     ...salv.map((x) => `Salvadanaio ${x.nome}`), 'Totale salvadanai',
     'Saldo al netto dei salvadanai', 'Saldo al netto dei finanziamenti', 'Saldo netto totale'];
   const proiezione = [intest.map(h), ...righe.map((x) => [
     `${NOMI_MESI[x.ym.m - 1]} ${x.ym.y}`,
     e(x.entrate), e(x.spese), eb(x.utile), e(x.extraManuale), eb(x.extraVoci), eb(x.periodico),
     eb(x.saldoContabile), e(x.valoreBuono), e(x.rata), eb(x.residuoFinanziamenti),
+    ...(perFin ? fin.flatMap((f) => [e(x.finanziamenti[f.id]?.rata ?? 0), eb(x.finanziamenti[f.id]?.residuo ?? 0)]) : []),
     ...salv.map((sv) => e(x.salvadanai[sv.id] ?? 0)), eb(x.totaleSalvadanai),
     eb(x.saldoAlNettoSalvadanai), eb(x.saldoNettoFinanziamenti), eb(x.saldoNettoTotale),
   ])];
@@ -78,13 +82,19 @@ export function fogliDati(s, oggi) {
 
   // 5. Impostazioni
   const imp = s.impostazioni;
+  const est = M.estinzioni(s, righe, oggi);
   const impostazioni = [
     [h('Impostazione'), h('Valore')],
     ['Inizio proiezione', `${NOMI_MESI[imp.inizioMese - 1]} ${imp.inizioAnno}`],
     ['Ultimo anno', imp.fineAnno],
     ['Saldo contabile iniziale', e(imp.saldoIniziale)],
-    ['Residuo finanziamenti iniziale', e(imp.residuoIniziale)],
     ['Disponibilità carte (plafond)', e(imp.plafondCarte)],
+    ['', ''],
+    [h('Finanziamento'), h('Residuo iniziale'), h('Rata mensile'), h('Estinguibile da')],
+    ...fin.map((f) => {
+      const es = est.find((x) => x.id === f.id);
+      return [f.nome, e(f.residuo), e(f.rata), es?.ym ? `${NOMI_MESI[es.ym.m - 1]} ${es.ym.y} (${Math.round(es.importo * 100) / 100} €)` : ''];
+    }),
     ['', ''],
     [h('Frasi della Home: Disponibilità da (€)'), h('Frase')],
     ...[...imp.frasi].sort((x, y) => x.soglia - y.soglia).map((f) => [e(f.soglia), f.testo]),
@@ -95,7 +105,7 @@ export function fogliDati(s, oggi) {
     { nome: 'Proiezione', righe: proiezione, larghezze: [12, ...intest.slice(1).map(() => 15)], bloccaRighe: 1, bloccaColonne: 1 },
     { nome: 'Voci', righe: voci, larghezze: [26, 14, 12, 7, ...NOMI_MESI.map(() => 5), 13], bloccaRighe: 1, bloccaColonne: 1 },
     { nome: 'Salvadanai', righe: salvadanai, larghezze: [20, 14, 14, 12, 13, 14, 16], bloccaRighe: 1 },
-    { nome: 'Impostazioni', righe: impostazioni, larghezze: [36, 80] },
+    { nome: 'Impostazioni', righe: impostazioni, larghezze: [36, 80, 14, 24] },
   ];
 }
 

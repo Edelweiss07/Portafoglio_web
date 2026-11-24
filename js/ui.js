@@ -49,6 +49,8 @@ export const ICONE = {
   cestino: icona('M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'),
   sinistra: icona('M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z'),
   destra: icona('M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'),
+  giu: icona('M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'),
+  trascina: icona('M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z'),
   home: icona('M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'),
   calendario: icona('M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z'),
   lista: icona('M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z'),

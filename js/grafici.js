@@ -2,7 +2,7 @@
 import { esc, euro } from './ui.js';
 
 export const COLORI = {
-  contabile: '#d32f2f', netto: '#f57c00', delta: '#1e88e5', straordinarie: '#8e24aa',
+  contabile: '#d32f2f', netto: '#f57c00', delta: '#1e88e5', straordinarie: '#8e24aa', estinzione: '#2e7d32',
   palette: ['#1e88e5', '#d81b60', '#43a047', '#fb8c00', '#8e24aa', '#00acc1', '#6d4c41', '#c0ca33'],
 };
 
@@ -11,13 +11,17 @@ const legenda = (serie) => `<div class="legenda">${serie.map((s) =>
 
 const scala = (min, max) => `<div class="scala"><span>min ${euro(min)}</span><span>max ${euro(max)}</span></div>`;
 
-function card(titolo, sottotitolo, corpo, serie) {
+function card(titolo, sottotitolo, corpo, serie, dopo = '') {
   return `<section class="scheda grafico"><div class="scheda-titolo"><h3>${esc(titolo)}</h3></div>
-    ${sottotitolo ? `<p class="sottotitolo">${esc(sottotitolo)}</p>` : ''}${corpo}${legenda(serie)}</section>`;
+    ${sottotitolo ? `<p class="sottotitolo">${esc(sottotitolo)}</p>` : ''}${corpo}${legenda(serie)}${dopo}</section>`;
 }
 
-/** serie: [{ nome, colore, valori }]; evidenzia: [primo, ultimo] indici da evidenziare. */
-export function graficoLinee(titolo, serie, evidenzia, sottotitolo) {
+/**
+ * serie: [{ nome, colore, valori }]; evidenzia: [primo, ultimo] indici da evidenziare.
+ * marcatori: [{ indice, etichetta, titolo }] punti evidenziati sulla prima serie (con linea verticale);
+ * dopo: HTML aggiunto in fondo alla scheda.
+ */
+export function graficoLinee(titolo, serie, evidenzia, sottotitolo, marcatori = [], dopo = '') {
   const n = Math.max(0, ...serie.map((s) => s.valori.length));
   if (n < 2) return '';
   const tutti = [...serie.flatMap((s) => s.valori), 0];
@@ -33,9 +37,20 @@ export function graficoLinee(titolo, serie, evidenzia, sottotitolo) {
   }
   const linee = serie.map((s) => `<polyline fill="none" stroke="${s.colore}" stroke-width="2" vector-effect="non-scaling-stroke"
     stroke-linejoin="round" points="${s.valori.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`).join('');
-  const svg = `<svg class="svg-grafico" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titolo)}">
-    ${sfondo}<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" class="zero" vector-effect="non-scaling-stroke"/>${linee}</svg>`;
-  return card(titolo, sottotitolo, scala(min, max) + svg, serie);
+  const validi = marcatori.filter((m) => m.indice != null && m.indice >= 0 && m.indice < n);
+  const verticali = validi.map((m) => `<line x1="${x(m.indice).toFixed(1)}" x2="${x(m.indice).toFixed(1)}" y1="0" y2="${H}"
+    class="marcatore-linea" vector-effect="non-scaling-stroke"/>`).join('');
+  // i punti sono in HTML sopra il grafico: con preserveAspectRatio="none" un cerchio SVG diventerebbe un'ellisse
+  // più punti nello stesso mese si impilano verso l'alto
+  const giaQui = {};
+  const punti = validi.map((m) => {
+    const k = giaQui[m.indice] = (giaQui[m.indice] ?? -1) + 1;
+    return `<span class="marcatore" style="left:${((100 * x(m.indice)) / W).toFixed(2)}%;top:${((100 * y(serie[0].valori[m.indice])) / H).toFixed(2)}%${k ? `;margin-top:-${k * 22}px` : ''}"
+    title="${esc(m.titolo || '')}">${esc(m.etichetta)}</span>`;
+  }).join('');
+  const svg = `<div class="area-grafico"><svg class="svg-grafico" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titolo)}">
+    ${sfondo}<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" class="zero" vector-effect="non-scaling-stroke"/>${verticali}${linee}</svg>${punti}</div>`;
+  return card(titolo, sottotitolo, scala(min, max) + svg, serie, dopo);
 }
 
 /** Barre raggruppate: etichette (12 mesi), serie con 12 valori ciascuna. */

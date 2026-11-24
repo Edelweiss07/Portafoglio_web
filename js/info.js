@@ -75,23 +75,26 @@ ${SMART}`],
 
   proiezione: ['Proiezione', `Mostra mese per mese come evolve il tuo saldo. Scorri a destra o a sinistra per cambiare anno.
 
-In ogni mese il pulsante "Parametri del mese" apre i campi da compilare:
+Ogni mese mostra in evidenza il Saldo contabile previsto; tocca il mese per aprire tutti i dettagli. Quando apri la scheda i mesi sono tutti chiusi.
+
+Nei dettagli di ogni mese il pulsante "Parametri del mese" apre i campi da compilare:
 • Entrate nette e Spese fisse: valgono anche per i mesi seguenti; l'app ti chiede fin dove applicare la modifica.
 • Valore buono pasto: come sopra.
 • Extra (manuale): entrate o uscite una tantum solo di quel mese. Qui finisce anche la Disponibilità riportata a fine mese.
-• Rata finanziamenti: vale anche per i mesi seguenti.
+• Rata di ogni finanziamento: vale anche per i mesi seguenti.
 
 Formule:
 • Utile = Entrate nette − Spese fisse.
 • Periodico = somma delle voci periodiche attive nel mese.
 • Saldo contabile = Saldo contabile del mese prima + Utile + Extra + Periodico.
-• Residuo finanziamenti = Residuo del mese prima − Rata.
+• Residuo di ogni finanziamento = Residuo del mese prima − sua Rata; Residuo finanziamenti = somma dei residui.
 • Totale salvadanai = somma dei saldi dei salvadanai.
 • Saldo al netto dei salvadanai = Saldo contabile − Totale salvadanai.
 • Saldo al netto dei finanziamenti = Saldo contabile − Residuo finanziamenti.
 • Saldo netto totale = Saldo contabile − Totale salvadanai − Residuo finanziamenti.
 
-Grafici: "Andamento" confronta Saldo contabile e Saldo netto totale su tutto il periodo; "Extra di fine mese" mostra mese per mese le Disponibilità riportate e le voci straordinarie.
+Grafici: "Andamento" mostra il Saldo contabile su tutto il periodo. I punti verdi numerati indicano da quando puoi estinguere ogni finanziamento senza che il saldo vada mai in negativo: si parte da quello con il residuo più basso, poi il successivo tenendo conto dei soldi già usati. Pagato il residuo, le rate dei mesi dopo restano sul conto (sono comprese nelle Spese fisse).
+"Extra di fine mese" mostra mese per mese le Disponibilità riportate e le voci straordinarie.
 
 ${GRASSETTO}`],
 
@@ -104,7 +107,8 @@ ${GRASSETTO}`],
 • Periodiche: si ripetono negli anni (assicurazione, bollo, tredicesima). Un mese attivato toccando i quadratini vale per l'anno mostrato e per tutti gli anni successivi; per cambiare solo un anno lontano, vai a quell'anno. "Tutti i mesi" li attiva in un colpo. Le spese che escono ogni mese (bollette, spesa, affitto) non vanno qui ma nelle Spese fisse, dai Parametri del mese.
 • Straordinarie: una tantum (un acquisto, un rimborso). Appartengono a un solo anno e non si ripetono.
 
-Importo negativo = uscita, positivo = entrata.
+L'importo si scrive sempre positivo: scegli Uscita (predefinita) o Entrata.
+Per cambiare l'ordine tieni premuta la maniglia ≡ a sinistra del nome e trascina la voce.
 Tocca il nome di una voce per modificarla, cambiarne il tipo (periodica / straordinaria), spostare una straordinaria in un altro anno o eliminarla.
 
 Formule:
@@ -131,13 +135,13 @@ ${GRASSETTO}`],
 
   obiettivoSalvadanaio: ['Obiettivo e frasi del salvadanaio', `• Obiettivo: l'importo da raggiungere (0 = nessun obiettivo).
 • Scadenza: mese e anno entro cui raggiungerlo. Serve a calcolare quanto mettere da parte ogni mese.
-• Frasi: la soglia è la percentuale dell'obiettivo raggiunta. Ogni frase compare quando l'avanzamento raggiunge la sua soglia e resta fino alla soglia successiva; sotto la soglia più bassa non compare nessuna frase.
+• Frasi: la soglia è la percentuale dell'obiettivo raggiunta. Compare la frase della soglia più alta raggiunta o superata dall'avanzamento; sotto la soglia più bassa non compare nessuna frase.
 
 ${SMART}
 
 ${FRASI_SMART}`],
 
-  impostazioni: ['Impostazioni', `Impostazioni generali dell'app: voci periodiche e straordinarie (pulsante "Gestisci le voci"), periodo della proiezione, valori di partenza, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel e reset.
+  impostazioni: ['Impostazioni', `Impostazioni generali dell'app: voci periodiche e straordinarie (pulsante "Gestisci le voci"), periodo della proiezione, valori di partenza, finanziamenti, plafond delle carte, frasi motivazionali della Home, backup, esportazione in Excel e reset.
 In fondo trovi il numero di versione.`],
 
   periodo: ['Periodo della proiezione', `• Mese e anno di inizio: il primo mese calcolato.
@@ -146,14 +150,28 @@ Allungare il periodo non cancella nulla; accorciarlo nasconde i mesi esclusi sen
 
   valoriPartenza: ['Valori di partenza', `Valori alla fine del mese prima dell'inizio della proiezione.
 • Saldo contabile iniziale: il saldo da cui parte il calcolo.
-• Residuo finanziamenti iniziale: il debito residuo di prestiti e finanziamenti.
+Il debito residuo di prestiti e finanziamenti si inserisce nella sezione Finanziamenti, uno per uno.
 Esempio: se la proiezione inizia a gennaio, inserisci i valori al 31 dicembre.`],
+
+  finanziamenti: ['Finanziamenti', `Prestiti e acquisti a rate, ognuno con:
+• Nome.
+• Residuo iniziale: quanto restava da pagare alla fine del mese prima dell'inizio della proiezione.
+• Rata mensile: quanto paghi ogni mese. Si può cambiare da un mese in poi con "Parametri del mese" in Proiezione.
+
+La rata non viene tolta dal Saldo contabile: deve essere già compresa nelle Spese fisse. Serve a calcolare il residuo:
+• Residuo = Residuo del mese prima − Rata (mai sotto zero).
+• Residuo finanziamenti = somma dei residui; entra nel Saldo al netto dei finanziamenti e nel Saldo netto totale.
+
+Nel grafico "Andamento" della Proiezione vedi da quale mese puoi estinguere ogni finanziamento senza andare in negativo, dal residuo più basso al più alto.`],
 
   parametri: ['Parametri', `• Disponibilità carte (plafond): il limite mensile delle carte di credito. Serve a calcolare le Spese carte attuali = Plafond − Residuo carte.
 Il valore del buono pasto si imposta mese per mese con il pulsante "Parametri del mese".`],
 
-  frasiHome: ['Frasi motivazionali della Home', `Ogni frase ha una soglia in euro: compare quando la Disponibilità raggiunge quella soglia e resta visibile fino a quando non si raggiunge la soglia successiva. Sotto la soglia più bassa non compare nessuna frase; lo stesso vale per un intervallo la cui frase è vuota.
-Esempio: soglie −200, 0, 500 → con Disponibilità 300 compare la frase della soglia 0; con 500 o più quella della soglia 500; sotto −200 nessuna frase.
+  frasiHome: ['Frasi motivazionali della Home', `Ogni frase ha una soglia in euro.
+• Soglia negativa: è superata quando la Disponibilità è minore della soglia.
+• Soglia positiva o zero: è superata quando la Disponibilità la raggiunge o è maggiore.
+Se più soglie sono superate compare la frase di quella più lontana da zero. Se nessuna soglia è superata, o la frase è vuota, non compare nulla.
+Esempio: soglie −1.000, −200, 0, 500 → con −1.500 compare la frase di −1.000; con −500 quella di −200; con −100 nessuna frase; con 300 quella di 0; con 500 o più quella di 500.
 
 ${FRASI_SMART}
 
